@@ -1,0 +1,309 @@
+{
+  "puzzles": [
+    {
+      "id": 1,
+      "fecha": "2026-11-05",
+      "grupos": [
+        {
+          "categoria": "Se llaman Diego",
+          "dificultad": 1,
+          "jugadores": ["Diego Forlán", "Diego Godín", "Diego Simeone", "Diego Milito"]
+        },
+        {
+          "categoria": "Ganaron el Balón de Oro",
+          "dificultad": 2,
+          "jugadores": ["Luka Modrić", "Kaká", "Rivaldo", "Michael Owen"]
+        },
+        {
+          "categoria": "Hijos de futbolistas",
+          "dificultad": 3,
+          "jugadores": ["Paolo Maldini", "Sergio Busquets", "Xabi Alonso", "Kasper Schmeichel"]
+        },
+        {
+          "categoria": "Jugaron en Boca y en River",
+          "dificultad": 4,
+          "jugadores": ["Gabriel Batistuta", "Claudio Caniggia", "Óscar Ruggeri", "Hugo Gatti"]
+        }
+      ],
+      "trampas": [
+        "Diego Forlán también es hijo de futbolista (su padre, Pablo Forlán, jugó en Uruguay)."
+      ]
+    },
+    {
+      "id": 2,
+      "fecha": "2026-11-06",
+      "grupos": [
+        {
+          "categoria": "Uruguayos",
+          "dificultad": 1,
+          "jugadores": ["Luis Suárez", "Edinson Cavani", "Federico Valverde", "Enzo Francescoli"]
+        },
+        {
+          "categoria": "Jugaron en el Napoli",
+          "dificultad": 2,
+          "jugadores": ["Diego Maradona", "Gonzalo Higuaín", "Ezequiel Lavezzi", "Marek Hamšík"]
+        },
+        {
+          "categoria": "Ganaron la Copa América con Chile",
+          "dificultad": 3,
+          "jugadores": ["Alexis Sánchez", "Arturo Vidal", "Claudio Bravo", "Gary Medel"]
+        },
+        {
+          "categoria": "Goleadores de un Mundial",
+          "dificultad": 4,
+          "jugadores": ["Mario Kempes", "Oleg Salenko", "Davor Šuker", "Miroslav Klose"]
+        }
+      ],
+      "trampas": [
+        "Edinson Cavani también jugó en el Napoli."
+      ]
+    },
+    {
+      "id": 3,
+      "fecha": "2026-11-07",
+      "grupos": [
+        {
+          "categoria": "Colombianos",
+          "dificultad": 1,
+          "jugadores": ["James Rodríguez", "Radamel Falcao", "Carlos Valderrama", "Luis Díaz"]
+        },
+        {
+          "categoria": "Jugaron en el Real Madrid",
+          "dificultad": 2,
+          "jugadores": ["Hugo Sánchez", "Iván Zamorano", "Fernando Redondo", "Keylor Navas"]
+        },
+        {
+          "categoria": "Porteros que marcaron goles",
+          "dificultad": 3,
+          "jugadores": ["José Luis Chilavert", "Rogério Ceni", "René Higuita", "Jorge Campos"],
+          "revisar": true
+        },
+        {
+          "categoria": "Jugaron en el Manchester United",
+          "dificultad": 4,
+          "jugadores": ["Diego Forlán", "Juan Sebastián Verón", "Antonio Valencia", "Ole Gunnar Solskjær"]
+        }
+      ],
+      "trampas": [
+        "James Rodríguez también jugó en el Real Madrid.",
+        "Radamel Falcao también jugó en el Manchester United.",
+        "René Higuita también es colombiano.",
+        "Keylor Navas es portero, pero no marcó goles."
+      ]
+    },
+    {
+      "id": 4,
+      "fecha": "2026-11-08",
+      "grupos": [
+        {
+          "categoria": "Peruanos que jugaron en Europa",
+          "dificultad": 1,
+          "jugadores": ["Claudio Pizarro", "Paolo Guerrero", "Jefferson Farfán", "Nolberto Solano"]
+        },
+        {
+          "categoria": "Jugaron en el Bayern Múnich",
+          "dificultad": 2,
+          "jugadores": ["Arturo Vidal", "Robert Lewandowski", "Arjen Robben", "Franck Ribéry"]
+        },
+        {
+          "categoria": "Campeones de la Champions con el Liverpool en 2019",
+          "dificultad": 3,
+          "jugadores": ["Mohamed Salah", "Virgil van Dijk", "Roberto Firmino", "Alisson Becker"]
+        },
+        {
+          "categoria": "Jugaron en el Schalke 04",
+          "dificultad": 4,
+          "jugadores": ["Raúl González", "Klaas-Jan Huntelaar", "Julian Draxler", "Kevin-Prince Boateng"]
+        }
+      ],
+      "trampas": [
+        "Claudio Pizarro y Paolo Guerrero también jugaron en el Bayern Múnich.",
+        "Jefferson Farfán también jugó en el Schalke 04."
+      ]
+    },
+    {
+      "id": 5,
+      "fecha": "2026-11-09",
+      "grupos": [
+        {
+          "categoria": "Mexicanos",
+          "dificultad": 1,
+          "jugadores": ["Hugo Sánchez", "Rafael Márquez", "Guillermo Ochoa", "Hirving Lozano"]
+        },
+        {
+          "categoria": "Jugaron en el Barcelona",
+          "dificultad": 2,
+          "jugadores": ["Ronaldinho", "Rivaldo", "Hristo Stoichkov", "Samuel Eto'o"]
+        },
+        {
+          "categoria": "Jugaron en el PSV Eindhoven",
+          "dificultad": 3,
+          "jugadores": ["Ruud van Nistelrooy", "Arjen Robben", "Park Ji-sung", "Dries Mertens"]
+        },
+        {
+          "categoria": "Tienen un hermano que también fue futbolista profesional",
+          "dificultad": 4,
+          "jugadores": ["Eden Hazard", "Kevin-Prince Boateng", "Diego Milito", "Gonzalo Higuaín"]
+        }
+      ],
+      "trampas": [
+        "Rafael Márquez también jugó en el Barcelona.",
+        "Hirving Lozano también jugó en el PSV Eindhoven."
+      ]
+    },
+    {
+      "id": 6,
+      "fecha": "2026-11-10",
+      "grupos": [
+        {
+          "categoria": "Campeones del mundo con Francia en 2018",
+          "dificultad": 1,
+          "jugadores": ["Kylian Mbappé", "Antoine Griezmann", "N'Golo Kanté", "Hugo Lloris"]
+        },
+        {
+          "categoria": "Jugaron en el Atlético de Madrid",
+          "dificultad": 2,
+          "jugadores": ["Sergio Agüero", "Radamel Falcao", "Diego Godín", "Fernando Torres"]
+        },
+        {
+          "categoria": "Ganaron el Balón de Oro",
+          "dificultad": 3,
+          "jugadores": ["Zinedine Zidane", "Michael Owen", "Pavel Nedvěd", "Andriy Shevchenko"]
+        },
+        {
+          "categoria": "Jugaron en el Leicester City",
+          "dificultad": 4,
+          "jugadores": ["Jamie Vardy", "Riyad Mahrez", "Kasper Schmeichel", "Wes Morgan"]
+        }
+      ],
+      "trampas": [
+        "Antoine Griezmann también jugó en el Atlético de Madrid.",
+        "N'Golo Kanté también jugó en el Leicester City.",
+        "Zinedine Zidane es francés y campeón del mundo, pero en 1998, no en 2018."
+      ]
+    },
+    {
+      "id": 7,
+      "fecha": "2026-11-11",
+      "grupos": [
+        {
+          "categoria": "Campeones del mundo con Brasil en 2002",
+          "dificultad": 1,
+          "jugadores": ["Ronaldo Nazário", "Rivaldo", "Ronaldinho", "Cafu"]
+        },
+        {
+          "categoria": "Jugaron en el Inter de Milán",
+          "dificultad": 2,
+          "jugadores": ["Javier Zanetti", "Esteban Cambiasso", "Wesley Sneijder", "Samuel Eto'o"]
+        },
+        {
+          "categoria": "Jugaron en el Santos",
+          "dificultad": 3,
+          "jugadores": ["Neymar", "Robinho", "Rodrygo", "Pelé"]
+        },
+        {
+          "categoria": "Campeones del mundo con Brasil en 1970",
+          "dificultad": 4,
+          "jugadores": ["Jairzinho", "Tostão", "Rivellino", "Carlos Alberto Torres"]
+        }
+      ],
+      "trampas": [
+        "Ronaldo Nazário también jugó en el Inter de Milán.",
+        "Pelé también fue campeón del mundo con Brasil en 1970."
+      ]
+    },
+    {
+      "id": 8,
+      "fecha": "2026-11-12",
+      "grupos": [
+        {
+          "categoria": "Argentinos campeones del mundo en 2022",
+          "dificultad": 1,
+          "jugadores": ["Ángel Di María", "Enzo Fernández", "Emiliano Martínez", "Alexis Mac Allister"]
+        },
+        {
+          "categoria": "Su apodo es un animal",
+          "dificultad": 2,
+          "jugadores": ["Lionel Messi", "Lautaro Martínez", "Julián Álvarez", "Radamel Falcao"]
+        },
+        {
+          "categoria": "Jugaron en el Liverpool",
+          "dificultad": 3,
+          "jugadores": ["Luis Suárez", "Javier Mascherano", "Philippe Coutinho", "Darwin Núñez"]
+        },
+        {
+          "categoria": "Máximos goleadores históricos de su selección",
+          "dificultad": 4,
+          "jugadores": ["Cristiano Ronaldo", "Robert Lewandowski", "Harry Kane", "Neymar"],
+          "revisar": true
+        }
+      ],
+      "trampas": [
+        "Messi, Lautaro Martínez y Julián Álvarez también son campeones del mundo 2022.",
+        "Alexis Mac Allister también jugó en el Liverpool.",
+        "Messi (Argentina), Suárez (Uruguay) y Falcao (Colombia) también son máximos goleadores de su selección."
+      ]
+    },
+    {
+      "id": 9,
+      "fecha": "2026-11-13",
+      "grupos": [
+        {
+          "categoria": "Ecuatorianos",
+          "dificultad": 1,
+          "jugadores": ["Antonio Valencia", "Enner Valencia", "Moisés Caicedo", "Álex Aguinaga"]
+        },
+        {
+          "categoria": "Paraguayos",
+          "dificultad": 2,
+          "jugadores": ["José Luis Chilavert", "Roque Santa Cruz", "Salvador Cabañas", "Óscar Cardozo"]
+        },
+        {
+          "categoria": "Jugaron en el Brighton",
+          "dificultad": 3,
+          "jugadores": ["Alexis Mac Allister", "Kaoru Mitoma", "Leandro Trossard", "Marc Cucurella"]
+        },
+        {
+          "categoria": "Jugaron en el Valencia CF",
+          "dificultad": 4,
+          "jugadores": ["David Villa", "Pablo Aimar", "Gaizka Mendieta", "Roberto Ayala"]
+        }
+      ],
+      "trampas": [
+        "Moisés Caicedo también jugó en el Brighton.",
+        "Antonio Valencia y Enner Valencia se apellidan Valencia, pero nunca jugaron en el Valencia CF."
+      ]
+    },
+    {
+      "id": 10,
+      "fecha": "2026-11-14",
+      "grupos": [
+        {
+          "categoria": "Entrenaron al Barcelona",
+          "dificultad": 1,
+          "jugadores": ["Pep Guardiola", "Johan Cruyff", "Luis Enrique", "Xavi Hernández"]
+        },
+        {
+          "categoria": "Entrenaron a la selección argentina",
+          "dificultad": 2,
+          "jugadores": ["Lionel Scaloni", "Diego Maradona", "Alejandro Sabella", "Gerardo Martino"]
+        },
+        {
+          "categoria": "Apodados \"El Loco\"",
+          "dificultad": 3,
+          "jugadores": ["Marcelo Bielsa", "Sebastián Abreu", "René Higuita", "Hugo Gatti"]
+        },
+        {
+          "categoria": "Ganaron la Copa de Europa como jugadores y como entrenadores",
+          "dificultad": 4,
+          "jugadores": ["Carlo Ancelotti", "Zinedine Zidane", "Giovanni Trapattoni", "Miguel Muñoz"]
+        }
+      ],
+      "trampas": [
+        "Marcelo Bielsa también entrenó a la selección argentina.",
+        "Gerardo Martino también entrenó al Barcelona.",
+        "Guardiola y Cruyff también ganaron la Copa de Europa como jugadores y como entrenadores."
+      ]
+    }
+  ]
+}

@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pipeline (Python)
+pipeline/.venv/
+__pycache__/
+
+# salidas del pipeline para revisar
+pipeline/salida/

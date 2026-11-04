@@ -1,0 +1,12 @@
+{
+  "_nota": "Ligas incluidas en la base. Códigos verificados a mano contra Wikidata el 2026-11-04. Ojo: Q194052 es la Serie B aunque su nombre en español dice 'Serie A'.",
+  "ligas": [
+    { "qid": "Q324867", "nombre": "LaLiga", "pais": "España", "fase": 1 },
+    { "qid": "Q9448", "nombre": "Premier League", "pais": "Inglaterra", "fase": 1 },
+    { "qid": "Q82595", "nombre": "Bundesliga", "pais": "Alemania", "fase": 1 },
+    { "qid": "Q15804", "nombre": "Serie A", "pais": "Italia", "fase": 1 },
+    { "qid": "Q13394", "nombre": "Ligue 1", "pais": "Francia", "fase": 1 },
+    { "qid": "Q223170", "nombre": "Primera División de Argentina", "pais": "Argentina", "fase": 1 },
+    { "qid": "Q606652", "nombre": "Liga 1", "pais": "Perú", "fase": 1 }
+  ]
+}
