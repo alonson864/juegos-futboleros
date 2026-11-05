@@ -37,6 +37,7 @@ MIEMBROS_MINIMOS = 6         # una categoría necesita al menos esta cantidad de
 MIEMBROS_CLUB = 8            # (los clubes ya son solo los grandes)
 PAISES_LATAM = ("Argentina", "Perú")  # países de ligas.json considerados latinoamericanos
 VENTANA_SIN_REPETIR = 7
+MAS_CONOCIDOS = 1500         # puesto máximo de fama de los jugadores de Conexiones
 
 
 @dataclass
@@ -51,8 +52,10 @@ class Categoria:
 def cargar(conn):
     # Solo jugadores reconocidos (los más visitados), clubes grandes y selecciones fuertes
     rec = reconocidos.cargar(conn)
+    # Conexiones usa solo los MAS_CONOCIDOS (más estricto que el resto de los juegos)
+    mas_conocidos = [j for j in rec.jugadores if rec.rango[j] <= MAS_CONOCIDOS]
     jugadores = {q: (n, v or 0) for q, n, v in conn.execute(
-        "select qid, nombre, visitas from jugadores_final where qid = any(%s)", (list(rec.jugadores),))}
+        "select qid, nombre, visitas from jugadores_final where qid = any(%s)", (mas_conocidos,))}
     canonico = {}                       # ficha del club o de su "primer equipo" -> club grande
     for c in list(rec.clubes) + list(rec.selecciones):
         for x in {c} | rec.alias[c]:
@@ -139,7 +142,7 @@ def elegir(pool: list[str], n: int, jugadores, rng: random.Random) -> list[str] 
     if len(pool) < n:
         return None
     # Preferimos jugadores conocidos, pero con variedad: se elige al azar entre los más populares
-    ordenados = sorted(pool, key=lambda q: -jugadores[q][1])[: max(n * 3, 10)]
+    ordenados = sorted(pool, key=lambda q: -jugadores[q][1])[: max(n * 2, 8)]
     return rng.sample(ordenados, n)
 
 

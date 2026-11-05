@@ -38,6 +38,7 @@ import reconocidos
 
 # Se completan en main(): clubes grandes y países de selecciones grandes (reconocibles)
 CLUBES_GRANDES: set[str] = set()
+FAMA_CLUB: dict[str, int] = {}
 PAISES_GRANDES: set[str] = set()
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
 
@@ -46,11 +47,13 @@ HOY = date.today()
 
 # Popularidad = número de Wikipedias con artículo
 DIFICULTADES = {
+    # Todos los jugadores son conocidos; la dificultad la da sobre todo lo creíble de la falsa.
     #             puesto por visitas: desde, hasta (1 = el más visitado), credibilidad mínima de la falsa
-    "facil":      (1, 600, 0.0),
-    "intermedio": (601, 2000, 0.35),
-    "dificil":    (2001, 4000, 0.6),
+    "facil":      (1, 400, 0.0),
+    "intermedio": (1, 1000, 0.35),
+    "dificil":    (1, 1600, 0.6),
 }
+CLUB_CONOCIDO = 12   # un club se muestra solo si pasaron por él al menos 12 jugadores reconocidos
 
 
 @dataclass
@@ -282,8 +285,11 @@ def gen_clubes_de_jugador(elegibles, dif, ctx, rng, n):
         if not puntuados:
             continue
         _, falso = rng.choice(puntuados[:5])
-        # Preferir clubes de nuestras ligas (más reconocibles) para las verdaderas
-        reales = sorted(j.clubes(), key=lambda c: (not liga_de[c], rng.random()))[:4]
+        # Las 4 verdaderas: solo clubes conocidos (nada de "Generation adidas"), preferidos los más famosos
+        conocidos = [c for c in j.clubes() if FAMA_CLUB.get(c, 0) >= CLUB_CONOCIDO]
+        if len(conocidos) < 4:
+            continue
+        reales = sorted(conocidos, key=lambda c: (-FAMA_CLUB.get(c, 0), rng.random()))[:4]
         opciones = [{"texto": clubes[c][0], "qid": c, "verdadera": True} for c in reales]
         opciones.append({"texto": clubes[falso][0], "qid": falso, "verdadera": False})
         yield {
@@ -397,6 +403,7 @@ def main() -> None:
             rec = reconocidos.cargar(conn)
             fotos = reconocidos.fotos(conn)
             CLUBES_GRANDES.update(c for x in rec.clubes for c in {x} | rec.alias[x])
+            FAMA_CLUB.update(rec.fama_club)
             PAISES_GRANDES.update(clubes[c][2] for c in rec.selecciones if c in clubes and clubes[c][2])
             elegibles = [j for j in jug.values() if j.fechas_completas()]
             print(f"{len(jug)} jugadores en la base; {len(elegibles)} con fechas en todos sus clubes.")

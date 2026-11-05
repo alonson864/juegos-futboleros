@@ -44,6 +44,7 @@ TEXTO = {
     "bota_de_oro": ("la Bota de Oro", "Bota de Oro"),
     "puskas": ("el Premio Puskás", "Premio Puskás"),
 }
+FAMA_MINIMA_EQUIPO = 300_000  # suma de visitas de sus jugadores (para que la opción falsa sea conocida)
 TORNEOS_CLUBES = {"champions"}
 TORNEOS_SELECCIONES = {"mundial", "eurocopa", "copa_america"}
 PREMIOS = {"balon_de_oro", "bota_de_oro", "puskas"}
@@ -64,6 +65,7 @@ class Datos:
     anios_activo: dict[str, tuple[int, int]] = field(default_factory=dict)
     alias: dict[str, set[str]] = field(default_factory=dict)
     tipo_equipo: dict[str, str] = field(default_factory=dict)        # club, seleccion, juvenil…
+    continente_equipo: dict[str, str | None] = field(default_factory=dict)
 
 
 def cargar(conn) -> Datos:
@@ -147,15 +149,21 @@ def cargar(conn) -> Datos:
         if fam and isinstance(valor, str):
             campeones_registros[fam] |= {valor} | alias[valor]
 
-    nombre_equipo, tipo_equipo = {}, {}
-    paises = dict(conn.execute("select qid, nombre from paises").fetchall())
+    nombre_equipo, tipo_equipo, continente_equipo = {}, {}, {}
+    paises, continentes = {}, {}
+    for q, n, cont in conn.execute("select qid, nombre, continente from paises"):
+        paises[q], continentes[q] = n, cont
     for q, n, t, pais in conn.execute("select qid, nombre, tipo, pais_qid from clubes_final"):
         # Las selecciones mayores se muestran con el nombre del país ("Bolivia")
         # Selecciones con su nombre real ("Inglaterra", no "Reino Unido"); clubes con nombre corto
         if t == "seleccion":
-            nombre_equipo[q] = nombre_seleccion(n, paises.get(pais)) or n
+            sel = nombre_seleccion(n, paises.get(pais))
+            nombre_equipo[q] = sel or n
+            if not sel:
+                t = "otro"            # femeninas, B, de otros deportes: nunca se usan como opción
         else:
             nombre_equipo[q] = club_corto(n)
+        continente_equipo[q] = continentes.get(pais)
         tipo_equipo[q] = t
     for q, n in conn.execute("select campeon_qid, campeon_nombre from ediciones where campeon_qid is not null"):
         nombre_equipo.setdefault(q, n)
@@ -173,7 +181,7 @@ def cargar(conn) -> Datos:
     nombre_familia = {f: TEXTO[f][1] for f in nombre_familia if f in TEXTO}
     return Datos(familia_de, nombre_familia, jugadores, leidos, titulos, registros, campeones,
                  campeones_registros, nombre_equipo, equipos_de,
-                 {j: (min(a), max(a)) for j, a in anios.items() if a}, alias, tipo_equipo)
+                 {j: (min(a), max(a)) for j, a in anios.items() if a}, alias, tipo_equipo, continente_equipo)
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +316,7 @@ def gen_equipos_campeones(d: Datos, dif: str, rng: random.Random, n: int):
         campeones = d.campeones.get(fam, {})
         if len(campeones) < 4:
             continue
+        veces_falsa: dict[str, int] = defaultdict(int)   # para no repetir siempre la misma falsa
         de_selecciones = fam in TORNEOS_SELECCIONES
         # Mismo tipo de equipo que los campeones (club o selección)
         tipo_valido = {e for e in fama_equipo if e in d.nombre_equipo}
@@ -318,21 +327,27 @@ def gen_equipos_campeones(d: Datos, dif: str, rng: random.Random, n: int):
             if len(pool) < 4:
                 break
             verdaderos = rng.sample(pool, 4)
+            # Falsa creíble: mismo tipo de equipo, del mismo continente que algún campeón
+            # (para la Copa América, una sudamericana), y conocida (pasaron muchos reconocidos)
+            conts = {d.continente_equipo.get(e) for e in campeones} - {None}
             candidatos = [e for e in tipo_valido if e not in d.campeones_registros.get(fam, set())
-                          and es_seleccion(d, e) == de_selecciones]
+                          and es_seleccion(d, e) == de_selecciones
+                          and d.continente_equipo.get(e) in conts
+                          and fama_equipo[e] >= FAMA_MINIMA_EQUIPO]
             if not candidatos:
                 break
 
             def credibilidad(e: str) -> float:
                 s = 0.6 if e in ganadores_de_algo else 0.0     # ganó otro de los torneos relevantes
-                return s + min(fama_equipo[e] / 20000, 0.4)    # muchos jugadores famosos pasaron por ahí
+                return s + min(fama_equipo[e] / 5_000_000, 0.4)  # muchos jugadores famosos pasaron por ahí
 
             puntuados = sorted(((credibilidad(e), e) for e in candidatos), reverse=True)
             minimo, maximo = {"facil": (0.0, 0.5), "intermedio": (0.2, 1.0), "dificil": (0.6, 1.0)}[dif]
-            puntuados = [(s, e) for s, e in puntuados if minimo <= s <= maximo][:6]
+            puntuados = [(s, e) for s, e in puntuados if minimo <= s <= maximo and veces_falsa[e] < 2][:6]
             if not puntuados:
                 break
             _, falso = rng.choice(puntuados)
+            veces_falsa[falso] += 1
             nombre = d.nombre_familia[fam]
             sujeto = "selecciones" if de_selecciones else "clubes"
             opciones = [{"texto": d.nombre_equipo[v], "qid": v, "verdadera": True} for v in verdaderos]

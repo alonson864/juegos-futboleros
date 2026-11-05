@@ -33,6 +33,7 @@ class Reconocidos:
     selecciones: dict[str, str]             # selección grande -> nombre ("Argentina")
     clubes: dict[str, str]                  # club grande -> país de su liga
     alias: dict[str, set[str]]
+    fama_club: dict[str, int]               # equipo -> cuántos jugadores reconocidos pasaron por él
 
     def tramo(self, desde: int, hasta: int) -> set[str]:
         """Jugadores entre los puestos `desde` y `hasta` por visitas."""
@@ -105,8 +106,9 @@ def cargar(conn) -> Reconocidos:
         for c, n in lista[:CLUBES_POR_PAIS]:
             if n >= tope:
                 grandes[c] = pais
+    fama_club = {c: len(js & reconocidos) for c, js in miembros.items()}
     conn.commit()
-    return Reconocidos(visitas, rango, reconocidos, selecciones, grandes, alias)
+    return Reconocidos(visitas, rango, reconocidos, selecciones, grandes, alias, fama_club)
 
 
 def fotos(conn) -> dict[str, dict]:
