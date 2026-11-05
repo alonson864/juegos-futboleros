@@ -123,6 +123,10 @@ def correr(conn, ejecucion, cantidad: int, forzar: bool) -> dict:
     # Competiciones que aparecen en los palmarés
     comp_tit = {t["competicion_titulo"] for _, _, _, h in procesados for t in h} | set(RELEVANTES)
     comp_qids = {qid_de[t]: t for t in comp_tit if t in qid_de}
+    # Si un código tiene varios títulos (p. ej. "Ballon d'Or" y "Ballon d’Or"), se usa el de RELEVANTES
+    for t in RELEVANTES:
+        if t in qid_de:
+            comp_qids[qid_de[t]] = t
     nombres = {e["id"]: wd.etiqueta(e) or comp_qids[e["id"]] for e in
                wd.entidades(list(comp_qids), props="labels", idiomas="es|en")}
 
@@ -172,7 +176,7 @@ def correr(conn, ejecucion, cantidad: int, forzar: bool) -> dict:
                 # Un torneo de equipos solo cuenta como título si NO está en la sección "Individual"
                 if tipo in ("torneo_clubes", "torneo_selecciones") and t["individual"]:
                     tipo = None
-                ediciones = t["ediciones"] or [(None, str(x)) for x in t["anios"]]
+                ediciones = t["ediciones"] or [(None, x) for x in t["anios"]]
                 for ed_titulo, etiqueta in ediciones:
                     ed_q = qid_de.get(ed_titulo) if ed_titulo else None
                     anio = anio_de(etiqueta) or anio_de(ed_titulo or "")

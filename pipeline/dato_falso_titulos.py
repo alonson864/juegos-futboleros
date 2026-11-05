@@ -29,11 +29,12 @@ FAMILIAS = {
     "balon_de_oro": ["Ballon d'Or", "FIFA Ballon d'Or"],
     "bota_de_oro": ["European Golden Shoe"],
     "puskas": ["FIFA Puskás Award"],
-    "mejor_fifa": ["The Best FIFA Men's Player", "FIFA World Player of the Year"],
 }
+# "Jugador Mundial de la FIFA" / "FIFA Balón de Oro" / "The Best" quedan fuera por ahora: en
+# Wikipedia a veces vienen en una sola línea mezclados según la época y no se separan bien.
 TORNEOS_CLUBES = {"champions"}
 TORNEOS_SELECCIONES = {"mundial", "eurocopa", "copa_america"}
-PREMIOS = {"balon_de_oro", "bota_de_oro", "puskas", "mejor_fifa"}
+PREMIOS = {"balon_de_oro", "bota_de_oro", "puskas"}
 
 
 @dataclass
@@ -81,6 +82,17 @@ def cargar(conn) -> Datos:
         t = fila_a_titulo(comp, anio, ind)
         if t and t[1]:
             titulos[j].add(t)
+
+    # Premios con un solo ganador por año: si aparecen varios ganadores el mismo año, ese
+    # dato es dudoso y no se usa como verdadero (sí cuenta como "registro" para la seguridad).
+    ganadores_por_anio: dict[tuple[str, int], set[str]] = defaultdict(set)
+    for j, ts in titulos.items():
+        for fam, a in ts:
+            ganadores_por_anio[(fam, a)].add(j)
+    maximo = {"balon_de_oro": 1, "puskas": 1, "bota_de_oro": 2}
+    dudosos = {k for k, js in ganadores_por_anio.items() if len(js) > maximo.get(k[0], 10_000)}
+    for j in titulos:
+        titulos[j] = {t for t in titulos[j] if t not in dudosos}
 
     # Todos los registros (originales + corregidos + valores de correcciones), para la seguridad
     registros: dict[str, set] = defaultdict(set)

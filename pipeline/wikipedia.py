@@ -221,7 +221,29 @@ def _texto_fecha(valor: str | None) -> str | None:
 # Palmarés
 # ---------------------------------------------------------------------------
 
-_NO_TITULO = re.compile(r"runner[s -]?up|second place|third place|fourth place|finalist|semi-?final", re.I)
+# Puestos que NO son títulos: subcampeón, 2.º/3.º, plata/bronce, nominado, finalista…
+_NO_TITULO = re.compile(
+    r"runner[s -]?up|(second|third|fourth)[ -]place|\b(2nd|3rd|4th)\b|finalist|semi-?final|"
+    r"silver|bronze|nomin|shortlist|candidate|podium|top three|"
+    r"\b(?:[2-9]|[1-9]\d)(?:st|nd|rd|th)\b|\bplace\b|\branked\b|"      # puestos: (6th place), (8th), (26th)
+    r"\b(fifth|sixth|seventh|eighth|ninth|tenth)\b", re.I)
+_TEMPORADA = re.compile(r"\b(1[89]\d\d|20\d\d)\s*[–/-]\s*(\d{2,4})\b|\b(1[89]\d\d|20\d\d)\b")
+
+
+def _partes(segmento: str) -> list[str]:
+    """Separa por comas de primer nivel (fuera de [[...]] y paréntesis)."""
+    partes, actual, nivel = [], [], 0
+    for i, ch in enumerate(segmento):
+        if segmento.startswith("[[", i) or ch == "(":
+            nivel += 1
+        elif segmento.startswith("]]", i) or ch == ")":
+            nivel -= 1
+        if ch == "," and nivel <= 0:
+            partes.append("".join(actual)); actual = []
+        else:
+            actual.append(ch)
+    partes.append("".join(actual))
+    return partes
 
 
 def palmares(texto: str) -> list[dict]:
@@ -252,10 +274,19 @@ def palmares(texto: str) -> list[dict]:
         comp = _ENLACE.search(antes)
         if not comp:
             continue
-        # "2018; runner-up: 2022" -> se descarta la parte del subcampeonato
-        despues = ";".join(seg for seg in despues.split(";") if not _NO_TITULO.search(seg))
+        # "2018; runner-up: 2022" o "1958 (third place), 1960": se descarta cada parte que no sea título
+        partes = []
+        for seg in despues.split(";"):
+            # Lo que va antes del primer año/enlace es una etiqueta que aplica a todo el tramo
+            prefijo = re.split(r"\[\[|\d", seg, maxsplit=1)[0]
+            if _NO_TITULO.search(prefijo):
+                continue
+            partes += [p for p in _partes(seg) if not _NO_TITULO.search(p)]
+        despues = ", ".join(partes)
         ediciones = [(e.group(1).strip(), (e.group(2) or e.group(1)).strip()) for e in _ENLACE.finditer(despues)]
-        anios = sorted({int(a) for a in _ANIO.findall(re.sub(r"\[\[[^\]|]*\|", "", despues))})
+        # Años sin enlace: se guardan como temporada ("2006–07") para no confundir el año
+        sin_enlaces = _ENLACE.sub("", despues)
+        anios = [m.group(0).replace(" ", "") for m in _TEMPORADA.finditer(sin_enlaces)]
         if not ediciones and not anios:
             continue
         titulos.append({

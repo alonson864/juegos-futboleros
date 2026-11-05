@@ -136,7 +136,12 @@ def correr(conn) -> dict:
         resumen_torneos[nombres.get(q, t)] = {"ediciones": len(eds), "con_campeon": sum(1 for e in eds if e[4]),
                                               "sin_campeon": [f"{e[3]} {e[2]}" for e in eds if not e[4]]}
 
-    # --- Premios de todos los jugadores de la base ---
+    # --- Premios: NO se toman de Wikidata ---
+    # Wikidata confunde premios parecidos (p. ej. la Bota de Oro europea con la Bota de Oro
+    # del Mundial), así que los premios salen solo del palmarés de Wikipedia (paso 4).
+    conn.execute("delete from titulos_jugador where fuente = 'wikidata'")
+    conn.commit()
+    return {"torneos": resumen_torneos, "premios": {}}
     premios = {q: v for q, v in comps.items() if v[1] == "premio"}
     valores = " ".join("wd:" + q for q in premios)
     print(f"Consultando {len(premios)} premios en Wikidata…", flush=True)

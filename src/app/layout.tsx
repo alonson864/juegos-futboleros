@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Inter } from "next/font/google";
 import Link from "next/link";
+import { Pelota } from "./componentes/Cancha";
+import Navegacion from "./componentes/Navegacion";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,14 +18,11 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: "Juegos Futboleros",
-  description: "Juegos de fútbol para jugar con tus amigos.",
+  description: "Juegos de fútbol para jugar con tus amigos, con datos reales de jugadores, clubes y torneos.",
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#0e7a3e" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1510" },
-  ],
+  themeColor: "#07261a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -33,50 +32,77 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${barlowCondensed.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <header className="bg-cancha text-sobre-cancha">
-          <div className="mx-auto flex h-14 w-full max-w-3xl items-center px-4 lg:h-16 lg:max-w-6xl lg:px-8">
-            <Link href="/" className="flex items-center gap-2" aria-label="Juegos Futboleros, inicio">
-              <Pelota />
-              <span className="font-display text-xl font-extrabold uppercase tracking-wide lg:text-2xl">
-                Juegos Futboleros
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-noche/90 text-white backdrop-blur-md">
+          <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-4 px-4 lg:h-16 lg:max-w-6xl lg:px-8">
+            <Link href="/" className="flex items-center gap-2.5" aria-label="Juegos Futboleros, inicio">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cancha text-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] lg:h-9 lg:w-9">
+                <Pelota className="h-5 w-5 lg:h-6 lg:w-6" />
+              </span>
+              <span className="font-display text-lg leading-none font-extrabold uppercase tracking-wide lg:text-2xl">
+                Juegos <span className="text-tarjeta">Futboleros</span>
               </span>
             </Link>
+            <Navegacion />
           </div>
         </header>
+
         {children}
-        <footer className="mt-auto border-t border-borde">
-          <div className="mx-auto flex max-w-3xl flex-col gap-1 px-4 py-5 text-center text-xs text-tenue lg:max-w-6xl lg:text-sm">
-            <p>Hecho para jugar con amigos ⚽</p>
-            <p>
-              Datos de{" "}
-              <a href="https://www.wikidata.org" className="underline hover:text-tinta">Wikidata</a> (CC0) y{" "}
-              <a href="https://en.wikipedia.org" className="underline hover:text-tinta">Wikipedia</a>, con licencia{" "}
-              <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" className="underline hover:text-tinta">
-                CC BY-SA 4.0
-              </a>
-              .
+
+        <footer className="mt-auto bg-noche text-white/70">
+          <div className="mx-auto grid w-full max-w-3xl gap-8 px-4 py-10 text-sm sm:grid-cols-3 lg:max-w-6xl lg:px-8 lg:py-14">
+            <div>
+              <p className="flex items-center gap-2 font-display text-xl font-extrabold uppercase text-white">
+                <Pelota className="h-5 w-5" /> Juegos Futboleros
+              </p>
+              <p className="mt-3 max-w-xs">
+                Juegos de fútbol para jugar con amigos, armados con datos reales de jugadores, clubes y torneos.
+              </p>
+            </div>
+            <div>
+              <p className="font-display text-base font-bold uppercase tracking-wide text-white">Juegos</p>
+              <ul className="mt-3 space-y-2">
+                <li>
+                  <Link href="/juegos/conexiones" className="hover:text-white">
+                    Conexiones
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/juegos/dato-falso" className="hover:text-white">
+                    Dato Falso Futbolero
+                  </Link>
+                </li>
+                <li className="text-white/40">Mayor o menor (pronto)</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-display text-base font-bold uppercase tracking-wide text-white">Fuentes</p>
+              <p className="mt-3">
+                Datos de{" "}
+                <a href="https://www.wikidata.org" className="underline decoration-white/30 hover:text-white">
+                  Wikidata
+                </a>{" "}
+                (CC0) y{" "}
+                <a href="https://en.wikipedia.org" className="underline decoration-white/30 hover:text-white">
+                  Wikipedia
+                </a>
+                , con licencia{" "}
+                <a
+                  href="https://creativecommons.org/licenses/by-sa/4.0/deed.es"
+                  className="underline decoration-white/30 hover:text-white"
+                >
+                  CC BY-SA 4.0
+                </a>
+                . Fotos de Wikimedia Commons con su autor y licencia.
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-white/10">
+            <p className="mx-auto max-w-3xl px-4 py-4 text-xs text-white/40 lg:max-w-6xl lg:px-8">
+              Hecho para jugar con amigos ⚽
             </p>
           </div>
         </footer>
       </body>
     </html>
-  );
-}
-
-function Pelota() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden="true">
-      <circle cx="12" cy="12" r="10.5" fill="currentColor" />
-      <path
-        d="M12 7.2l3.6 2.6-1.4 4.2H9.8L8.4 9.8z"
-        className="fill-cancha"
-      />
-      <path
-        d="M12 1.5v5.7M15.6 9.8l5.6-1.8M14.2 14l3.4 4.6M9.8 14l-3.4 4.6M8.4 9.8L2.8 8"
-        stroke="var(--cancha)"
-        strokeWidth="1.4"
-        fill="none"
-      />
-    </svg>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import EncabezadoJuego from "../../componentes/EncabezadoJuego";
 import DatoFalso from "./DatoFalso";
 import { leerPreguntas } from "./datos";
 
@@ -12,21 +12,27 @@ export default async function PaginaDatoFalso() {
   const preguntas = await leerPreguntas();
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6 lg:max-w-5xl lg:px-8 lg:py-10">
-      <Link href="/" className="text-sm font-medium text-cancha hover:underline">
-        ← Todos los juegos
-      </Link>
-      <h1 className="mt-3 font-display text-4xl leading-none font-extrabold uppercase lg:text-6xl">
-        Dato Falso <span className="text-roja">Futbolero</span>
-      </h1>
-      <p className="mt-1.5 text-sm text-tenue lg:mt-3 lg:max-w-2xl lg:text-lg">
-        Duelo para dos en una misma pantalla. Cuatro datos son verdaderos y uno es falso: encuéntralo antes que tu amigo.
-      </p>
-      {preguntas.length > 0 ? (
-        <DatoFalso preguntas={preguntas} />
-      ) : (
-        <p className="mt-10 text-center text-tenue">Todavía no hay preguntas disponibles.</p>
-      )}
+    <main className="flex flex-1 flex-col">
+      <EncabezadoJuego
+        titulo="Dato Falso"
+        acento="Futbolero"
+        descripcion="Duelo para dos en una misma pantalla. Cuatro datos son verdaderos y uno es falso: encuéntralo antes que tu amigo."
+        etiquetas={["2 jugadores", "20 rondas", "Fácil · Intermedio · Difícil"]}
+      />
+      <div className="puntos flex-1">
+        <div className="mx-auto w-full max-w-md px-4 pt-2 pb-12 lg:max-w-5xl lg:px-8 lg:pt-6 lg:pb-20">
+          <div className="lg:sombra-tarjeta lg:mt-4 lg:rounded-3xl lg:border lg:border-borde lg:bg-superficie lg:px-10 lg:pt-2 lg:pb-10">
+            {preguntas.length > 0 ? (
+              <DatoFalso preguntas={preguntas} />
+            ) : (
+              <div className="mt-8 rounded-3xl border border-dashed border-borde bg-superficie/60 px-6 py-12 text-center">
+                <p className="font-display text-2xl font-extrabold uppercase">Calentando motores</p>
+                <p className="mt-2 text-tenue">Todavía no hay preguntas disponibles. Vuelve en un rato.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
