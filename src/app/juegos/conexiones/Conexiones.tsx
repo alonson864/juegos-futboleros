@@ -6,10 +6,10 @@ import type { Grupo, Puzzle } from "./tipos";
 const MAX_ERRORES = 4;
 
 const COLORES: Record<number, string> = {
-  1: "bg-yellow-300 text-yellow-950",
-  2: "bg-green-400 text-green-950",
-  3: "bg-sky-400 text-sky-950",
-  4: "bg-purple-400 text-purple-950",
+  1: "bg-grupo-1",
+  2: "bg-grupo-2",
+  3: "bg-grupo-3",
+  4: "bg-grupo-4",
 };
 
 // La fecha solo se conoce en el navegador; en el servidor devolvemos null.
@@ -61,7 +61,7 @@ export default function Conexiones({ puzzles }: { puzzles: Puzzle[] }) {
   const [elegido, setElegido] = useState<number | null>(null);
 
   if (hoy === null) {
-    return <p className="mt-8 text-center text-foreground/60">Cargando…</p>;
+    return <p className="mt-10 text-center text-tenue">Cargando…</p>;
   }
 
   const indice = elegido ?? indiceDelDia(puzzles, hoy);
@@ -69,25 +69,26 @@ export default function Conexiones({ puzzles }: { puzzles: Puzzle[] }) {
 
   return (
     <>
-      <nav className="mt-5 flex items-center justify-between gap-2 text-sm">
+      <nav className="mt-5 flex items-center justify-between gap-2 rounded-full border border-borde bg-superficie p-1 text-sm">
         <button
           type="button"
           onClick={() => setElegido(indice - 1)}
           disabled={indice === 0}
-          className="rounded-full px-3 py-1 hover:bg-foreground/10 disabled:opacity-30"
+          className="rounded-full px-3 py-1.5 font-medium text-cancha hover:bg-superficie-2 disabled:text-tenue disabled:opacity-40 disabled:hover:bg-transparent"
         >
-          ← Anterior
+          ←<span className="sr-only sm:not-sr-only"> Anterior</span>
         </button>
-        <span className="text-center font-medium">
-          #{puzzle.id} · {formatearFecha(puzzle.fecha)}
+        <span className="text-center leading-tight">
+          <span className="block font-display text-base font-bold uppercase">Puzzle #{puzzle.id}</span>
+          <span className="block text-xs text-tenue">{formatearFecha(puzzle.fecha)}</span>
         </span>
         <button
           type="button"
           onClick={() => setElegido(indice + 1)}
           disabled={indice === puzzles.length - 1}
-          className="rounded-full px-3 py-1 hover:bg-foreground/10 disabled:opacity-30"
+          className="rounded-full px-3 py-1.5 font-medium text-cancha hover:bg-superficie-2 disabled:text-tenue disabled:opacity-40 disabled:hover:bg-transparent"
         >
-          Siguiente →
+          <span className="sr-only sm:not-sr-only">Siguiente </span>→
         </button>
       </nav>
       <Juego key={puzzle.id} puzzle={puzzle} />
@@ -107,6 +108,7 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
   const [errores, setErrores] = useState(0);
   const [intentos, setIntentos] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [sacudidas, setSacudidas] = useState(0);
 
   const perdio = errores >= MAX_ERRORES;
   const gano = resueltos.length === puzzle.grupos.length;
@@ -148,6 +150,7 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
 
     const nuevosErrores = errores + 1;
     setErrores(nuevosErrores);
+    setSacudidas(sacudidas + 1);
     const casi = puzzle.grupos.some(
       (g) => g.jugadores.filter((j) => seleccion.includes(j)).length === 3,
     );
@@ -155,19 +158,19 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
   }
 
   return (
-    <section className="mt-4 flex flex-col gap-2">
+    <section className="mt-5 flex flex-col gap-2">
       {gruposVisibles.map((g) => (
         <div
           key={g.categoria}
-          className={`rounded-xl px-3 py-3 text-center ${COLORES[g.dificultad]}`}
+          className={`aparecer rounded-2xl px-3 py-3 text-center text-sobre-grupo lg:py-5 ${COLORES[g.dificultad]}`}
         >
-          <p className="text-sm font-bold uppercase">{g.categoria}</p>
-          <p className="mt-0.5 text-sm">{g.jugadores.join(", ")}</p>
+          <p className="font-display text-lg leading-tight font-extrabold uppercase lg:text-2xl">{g.categoria}</p>
+          <p className="mt-0.5 text-sm lg:text-base">{g.jugadores.join(" · ")}</p>
         </div>
       ))}
 
       {restantes.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
+        <div key={sacudidas} className={`grid grid-cols-4 gap-2 lg:gap-3 ${sacudidas > 0 ? "sacudir" : ""}`}>
           {restantes.map((jugador) => {
             const activo = seleccion.includes(jugador);
             return (
@@ -176,10 +179,10 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
                 type="button"
                 onClick={() => alternar(jugador)}
                 aria-pressed={activo}
-                className={`flex h-16 items-center justify-center rounded-xl px-1 text-center text-[11px] leading-tight font-semibold break-words hyphens-auto transition-colors sm:h-20 sm:text-sm ${
+                className={`flex h-[4.5rem] items-center justify-center rounded-2xl px-1 text-center font-display text-[15px] leading-[1.05] font-bold uppercase break-words hyphens-auto transition active:scale-95 sm:h-20 sm:text-lg lg:h-28 lg:rounded-3xl lg:px-3 lg:text-2xl ${
                   activo
-                    ? "bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-900"
-                    : "bg-stone-200 text-stone-900 hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
+                    ? "bg-tinta text-tiza shadow-inner"
+                    : "border border-borde bg-superficie text-tinta shadow-sm hover:bg-superficie-2"
                 }`}
               >
                 {jugador}
@@ -189,9 +192,14 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
         </div>
       )}
 
-      <p className="min-h-6 text-center text-sm font-medium" aria-live="polite">
+      <p
+        className={`flex min-h-8 items-center justify-center text-center text-sm font-semibold ${
+          gano ? "text-cancha" : perdio ? "text-roja" : "text-tinta"
+        }`}
+        aria-live="polite"
+      >
         {gano
-          ? "¡Bien jugado! Encontraste los 4 grupos."
+          ? "¡Golazo! Encontraste los 4 grupos."
           : perdio
             ? "Se acabaron los intentos. Estas eran las respuestas."
             : mensaje}
@@ -199,18 +207,24 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
 
       {!terminado && (
         <>
-          <p className="text-center text-sm text-foreground/70">
-            Errores disponibles:{" "}
-            <span aria-label={`${MAX_ERRORES - errores} de ${MAX_ERRORES}`}>
-              {"●".repeat(MAX_ERRORES - errores)}
-              <span className="opacity-25">{"●".repeat(errores)}</span>
+          <div className="flex items-center justify-center gap-2 text-sm text-tenue">
+            <span>Errores disponibles</span>
+            <span className="flex gap-1" aria-label={`${MAX_ERRORES - errores} de ${MAX_ERRORES}`}>
+              {Array.from({ length: MAX_ERRORES }, (_, i) => (
+                <span
+                  key={i}
+                  className={`h-4 w-3 rounded-[3px] transition-colors ${
+                    i < MAX_ERRORES - errores ? "bg-tarjeta" : "bg-roja"
+                  }`}
+                />
+              ))}
             </span>
-          </p>
-          <div className="mt-2 flex justify-center gap-2">
+          </div>
+          <div className="mt-3 flex justify-center gap-2">
             <button
               type="button"
               onClick={() => setOrden(mezclar(orden))}
-              className="rounded-full border border-foreground/30 px-4 py-2 text-sm font-medium"
+              className="rounded-full border border-borde bg-superficie px-4 py-2.5 font-display text-base font-bold uppercase tracking-wide hover:bg-superficie-2 lg:px-7 lg:py-3 lg:text-lg"
             >
               Mezclar
             </button>
@@ -218,15 +232,15 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
               type="button"
               onClick={() => setSeleccion([])}
               disabled={seleccion.length === 0}
-              className="rounded-full border border-foreground/30 px-4 py-2 text-sm font-medium disabled:opacity-40"
+              className="rounded-full border border-borde bg-superficie px-4 py-2.5 font-display text-base font-bold uppercase tracking-wide hover:bg-superficie-2 disabled:opacity-40 lg:px-7 lg:py-3 lg:text-lg"
             >
-              Deseleccionar
+              Borrar
             </button>
             <button
               type="button"
               onClick={enviar}
               disabled={seleccion.length !== 4}
-              className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
+              className="rounded-full bg-cancha px-5 py-2.5 font-display text-base font-bold uppercase tracking-wide text-sobre-cancha hover:bg-cancha-fuerte disabled:opacity-40 lg:px-9 lg:py-3 lg:text-lg"
             >
               Enviar
             </button>

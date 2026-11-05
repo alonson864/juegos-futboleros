@@ -1,27 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import datos from "../../../../data/conexiones.json";
 import Conexiones from "./Conexiones";
-import type { Puzzle } from "./tipos";
+import { leerPuzzles } from "./datos";
 
 export const metadata: Metadata = {
   title: "Conexiones | Juegos Futboleros",
   description: "Encuentra los cuatro grupos de cuatro futbolistas.",
 };
 
-export default function PaginaConexiones() {
-  const puzzles: Puzzle[] = datos.puzzles;
+export default async function PaginaConexiones() {
+  const puzzles = await leerPuzzles();
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6">
-      <Link href="/" className="text-sm text-foreground/60 hover:text-foreground">
-        ← Inicio
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6 lg:max-w-3xl lg:px-8 lg:py-10">
+      <Link href="/" className="text-sm font-medium text-cancha hover:underline">
+        ← Todos los juegos
       </Link>
-      <h1 className="mt-3 text-3xl font-bold">🔗 Conexiones</h1>
-      <p className="mt-1 text-sm text-foreground/70">
+      <h1 className="mt-3 font-display text-4xl leading-none font-extrabold uppercase lg:text-6xl">Conexiones</h1>
+      <p className="mt-1.5 text-sm text-tenue lg:mt-3 lg:text-lg">
         Encuentra los 4 grupos de 4 futbolistas que tienen algo en común.
       </p>
-      <Conexiones puzzles={puzzles} />
+      {puzzles.length > 0 ? (
+        <Conexiones puzzles={puzzles} />
+      ) : (
+        <p className="mt-10 text-center text-tenue">Todavía no hay puzzles disponibles.</p>
+      )}
     </main>
   );
 }

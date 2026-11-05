@@ -1,8 +1,11 @@
 """Paso 1: clubes de las ligas de pipeline/ligas.json.
 
-Junta dos fuentes de Wikidata:
-  - "club": el club dice que juega/jugó en la liga (propiedad P118).
-  - "temporadas": el club aparece como participante (P1923) de una temporada de la liga.
+Junta tres fuentes:
+  - "club": en Wikidata, el club dice que juega/jugó en la liga (propiedad P118).
+  - "temporadas": en Wikidata, el club es participante (P1923) de una temporada de la liga.
+  - "wikipedia": solo para ligas con "wikipedia_temporadas" en ligas.json; clubes del
+    mismo país enlazados desde el artículo de cada temporada en Wikipedia en español
+    (licencia CC BY-SA).
 
 Guarda ligas, países, clubes y la relación club-liga en Supabase, registra qué
 cambió desde la última vez y escribe pipeline/salida/clubes_para_revisar.csv.
@@ -15,6 +18,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -92,6 +96,73 @@ def candidatos(ligas: list[dict]) -> dict[tuple[str, str], dict]:
     return pares
 
 
+def desde_wikipedia(ligas: list[dict], pares: dict) -> None:
+    """Agrega a `pares` los clubes enlazados desde los artículos de temporada en Wikipedia."""
+    ligas_wp = [l for l in ligas if l.get("wikipedia_temporadas")]
+    if not ligas_wp:
+        return
+    pais_liga = {e["id"]: (wd.valores(e, "P17") or [None])[0]
+                 for e in wd.entidades([l["qid"] for l in ligas_wp], props="claims")}
+    for liga in ligas_wp:
+        print(f"Leyendo artículos de temporada de {liga['nombre']} en Wikipedia en español…")
+        temporadas = wd.sparql(f"""
+            SELECT ?art WHERE {{
+              ?temp wdt:P3450 wd:{liga["qid"]} .
+              ?art schema:about ?temp ; schema:isPartOf <https://es.wikipedia.org/> .
+            }}""")
+        apariciones: dict[str, list[str]] = {}  # club -> años de las temporadas
+        for t in temporadas:
+            titulo = requests_unquote(t["art"].rsplit("/", 1)[-1]).replace("_", " ")
+            anio = re.search(r"\b(1[89]\d\d|20\d\d)\b", titulo)
+            for q in set(wd.enlaces_wikipedia(titulo)):
+                apariciones.setdefault(q, []).append(anio.group(1) if anio else "")
+        print(f"  {len(temporadas)} artículos, {len(apariciones)} enlaces distintos; filtrando clubes…")
+
+        pais = pais_liga.get(liga["qid"])
+        for club, paises in clubes_y_paises(list(apariciones)).items():
+            anios = sorted(a for a in apariciones[club] if a)
+            # Clubes de otro país (rivales internacionales mencionados) no cuentan.
+            # Sin país en Wikidata, se acepta solo si aparece en 2 o más temporadas.
+            if paises and pais not in paises:
+                continue
+            if not paises and len(apariciones[club]) < 2:
+                continue
+            dato = pares.setdefault((club, liga["qid"]),
+                                    {"origen": set(), "inicio": None, "fin": None, "temporadas": None})
+            dato["origen"].add("wikipedia")
+            dato["temporadas"] = max(dato["temporadas"] or 0, len(apariciones[club]))
+            if anios:
+                dato["inicio"] = dato["inicio"] or f"{anios[0]}-01-01"
+                dato["fin"] = dato["fin"] or f"{anios[-1]}-12-31"
+
+
+def clubes_y_paises(qids: list[str]) -> dict[str, set[str]]:
+    """De una lista de códigos, devuelve solo los que son clubes, con sus países (P17).
+
+    Pregunta por lotes con SPARQL en vez de bajar la ficha completa de cada uno.
+    """
+    tipos = " ".join("wd:" + t for t in TIPOS_CLUB)
+    salida: dict[str, set[str]] = {}
+    for i in range(0, len(qids), 400):
+        valores = " ".join("wd:" + q for q in qids[i : i + 400])
+        for f in wd.sparql(f"""
+            SELECT DISTINCT ?x ?pais WHERE {{
+              VALUES ?x {{ {valores} }}
+              VALUES ?tipo {{ {tipos} }}
+              ?x wdt:P31 ?tipo .
+              OPTIONAL {{ ?x wdt:P17 ?pais }}
+            }}"""):
+            paises = salida.setdefault(wd.qid(f["x"]), set())
+            if "pais" in f:
+                paises.add(wd.qid(f["pais"]))
+    return salida
+
+
+def requests_unquote(texto: str) -> str:
+    from urllib.parse import unquote
+    return unquote(texto)
+
+
 def unir_equipos(pares: dict, info: dict, ligas_qid: set[str]) -> dict[str, tuple[str, str]]:
     """Reemplaza las fichas de 'primer equipo' por su club. Devuelve {equipo: (club, motivo)}."""
     equipos = [q for q in {c for c, _ in pares} if EQUIPO_MASCULINO in wd.valores(info.get(q, {}), "P31")]
@@ -145,6 +216,7 @@ def main() -> None:
 def correr(conn, ligas, nombre_liga, ejecucion) -> dict:
     anterior = ultima_ejecucion_ok(conn, PASO)
     pares = candidatos(ligas)
+    desde_wikipedia(ligas, pares)
 
     print(f"Leyendo detalles de {len({c for c, _ in pares})} clubes candidatos…")
     info = {e["id"]: e for e in wd.entidades({c for c, _ in pares})}
@@ -153,6 +225,7 @@ def correr(conn, ligas, nombre_liga, ejecucion) -> dict:
     for equipo, (club, _) in alias.items():
         unidos.setdefault(club, []).append(equipo)
 
+    desde_liga = {l["qid"]: l["desde"] for l in ligas if l.get("desde")}
     aceptados: dict[str, dict] = {}
     filas_csv = []
     for (club, liga), dato in sorted(pares.items(), key=lambda x: (nombre_liga[x[0][1]], x[0][0])):
@@ -164,9 +237,12 @@ def correr(conn, ligas, nombre_liga, ejecucion) -> dict:
         # duplicado de un club que ya está en la lista con su propia ficha.
         if es_club and EQUIPO_MASCULINO in tipos and wd.contar_wikipedias(e) == 0:
             es_club, motivo = False, "ficha de equipo sin artículo ni club conocido (duplicado)"
+        desde = desde_liga.get(liga)
+        if es_club and desde and dato["fin"] and dato["fin"] < desde:
+            es_club, motivo = False, f"solo jugó la liga antes de {desde[:4]}"
         nombre = wd.etiqueta(e) or club
         paises = wd.valores(e, "P17")
-        origen = "ambos" if len(dato["origen"]) == 2 else next(iter(dato["origen"]))
+        origen = "+".join(sorted(dato["origen"]))
         filas_csv.append({
             "liga": nombre_liga[liga],
             "club": nombre,
@@ -206,9 +282,9 @@ def correr(conn, ligas, nombre_liga, ejecucion) -> dict:
         por_liga[l["nombre"]] = {
             "incluidos": sum(f["incluido"] == "sí" for f in filas),
             "descartados": sum(f["incluido"] == "no" for f in filas),
-            "solo_club": sum(f["incluido"] == "sí" and f["origen"] == "club" for f in filas),
-            "solo_temporadas": sum(f["incluido"] == "sí" and f["origen"] == "temporadas" for f in filas),
-            "ambos": sum(f["incluido"] == "sí" and f["origen"] == "ambos" for f in filas),
+            "con_club": sum(f["incluido"] == "sí" and "club" in f["origen"] for f in filas),
+            "con_temporadas": sum(f["incluido"] == "sí" and "temporadas" in f["origen"] for f in filas),
+            "con_wikipedia": sum(f["incluido"] == "sí" and "wikipedia" in f["origen"] for f in filas),
             "sin_fechas": sum(f["incluido"] == "sí" and not f["desde"] and not f["hasta"] for f in filas),
         }
     return {
@@ -302,10 +378,11 @@ def guardar(conn, ligas, aceptados, nombres_pais, ejecucion, alias) -> dict:
 def imprimir_reporte(r: dict) -> None:
     print("\n=== Reporte del paso 1: clubes ===")
     print(f"Clubes incluidos: {r['clubes']}")
-    print(f"{'Liga':<32}{'incl.':>6}{'desc.':>6}{'solo club':>11}{'solo temp.':>11}{'ambos':>7}{'sin fechas':>11}")
+    print("(una relación puede venir de varias fuentes a la vez)")
+    print(f"{'Liga':<32}{'incl.':>6}{'desc.':>6}{'club':>6}{'temp.':>7}{'wikip.':>8}{'sin fechas':>11}")
     for liga, d in r["por_liga"].items():
-        print(f"{liga:<32}{d['incluidos']:>6}{d['descartados']:>6}{d['solo_club']:>11}"
-              f"{d['solo_temporadas']:>11}{d['ambos']:>7}{d['sin_fechas']:>11}")
+        print(f"{liga:<32}{d['incluidos']:>6}{d['descartados']:>6}{d['con_club']:>6}"
+              f"{d['con_temporadas']:>7}{d['con_wikipedia']:>8}{d['sin_fechas']:>11}")
     c = r["cambios"]
     desde = f"desde la ejecución del {r['anterior'][:16].replace('T', ' ')}" if r["anterior"] else "(primera ejecución)"
     print(f"\nCambios {desde}: {c['clubes_nuevos']} clubes nuevos, {c['clubes_modificados']} modificados, "

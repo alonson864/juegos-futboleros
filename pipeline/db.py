@@ -19,7 +19,9 @@ def conectar() -> psycopg.Connection:
             "Falta SUPABASE_DB_URL en el archivo .env (con la contraseña de la base ya puesta)."
         )
     # prepare_threshold=None: el pooler de Supabase no admite sentencias preparadas.
-    return psycopg.connect(url, prepare_threshold=None, connect_timeout=20)
+    # keepalives: evitan que la red corte la conexión si queda un rato sin tráfico
+    return psycopg.connect(url, prepare_threshold=None, connect_timeout=20,
+                           keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5)
 
 
 def iniciar_ejecucion(conn: psycopg.Connection, paso: str) -> int:

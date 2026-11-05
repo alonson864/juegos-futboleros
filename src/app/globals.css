@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
+/*
+ * Paleta "cancha"
+ * - cancha:   verde césped (color principal, botones, enlaces)
+ * - tiza:     fondo crema, como las líneas de cal de la cancha
+ * - tinta:    texto principal (verde casi negro)
+ * - tarjeta:  amarillo de tarjeta amarilla (acentos, destacados)
+ * - roja:     rojo de tarjeta roja (errores)
+ * - rival:    azul del jugador 2 en los duelos
+ * - grupo-1..4: colores de los grupos de Conexiones, de más fácil a más difícil
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --tiza: #f5f2e9;
+  --superficie: #ffffff;
+  --superficie-2: #ebe6d8;
+  --tinta: #0f1f17;
+  --tenue: #5a6a60;
+  --borde: #ddd6c4;
+  --cancha: #0e7a3e;
+  --cancha-fuerte: #0a5c2e;
+  --sobre-cancha: #ffffff;
+  --tarjeta: #f5c518;
+  --roja: #d93a2b;
+  --rival: #1d6fa5;
+  --sobre-rival: #ffffff;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --grupo-1: #f5c518;
+  --grupo-2: #63c27c;
+  --grupo-3: #5aade6;
+  --grupo-4: #a77bdb;
+  --sobre-grupo: #10140f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --tiza: #0b1510;
+    --superficie: #13221a;
+    --superficie-2: #1c2f24;
+    --tinta: #eef3ec;
+    --tenue: #9aaea2;
+    --borde: #26392e;
+    --cancha: #22a85a;
+    --cancha-fuerte: #2fc46c;
+    --sobre-cancha: #06140c;
+    --tarjeta: #f7cf3d;
+    --roja: #f0604f;
+    --rival: #5aade6;
+    --sobre-rival: #06121c;
   }
 }
 
+@theme inline {
+  --color-tiza: var(--tiza);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-tinta: var(--tinta);
+  --color-tenue: var(--tenue);
+  --color-borde: var(--borde);
+  --color-cancha: var(--cancha);
+  --color-cancha-fuerte: var(--cancha-fuerte);
+  --color-sobre-cancha: var(--sobre-cancha);
+  --color-tarjeta: var(--tarjeta);
+  --color-roja: var(--roja);
+  --color-rival: var(--rival);
+  --color-sobre-rival: var(--sobre-rival);
+  --color-grupo-1: var(--grupo-1);
+  --color-grupo-2: var(--grupo-2);
+  --color-grupo-3: var(--grupo-3);
+  --color-grupo-4: var(--grupo-4);
+  --color-sobre-grupo: var(--sobre-grupo);
+
+  /* compatibilidad con clases existentes */
+  --color-background: var(--tiza);
+  --color-foreground: var(--tinta);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-barlow-condensed);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--tiza);
+  color: var(--tinta);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Líneas de cancha muy suaves de fondo */
+.fondo-cancha {
+  background-image:
+    radial-gradient(circle at 50% 0, transparent 0 7.5rem, color-mix(in srgb, var(--cancha) 14%, transparent) 7.5rem 7.65rem, transparent 7.65rem),
+    linear-gradient(to bottom, color-mix(in srgb, var(--cancha) 14%, transparent) 0 0.15rem, transparent 0.15rem);
+  background-repeat: no-repeat;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .aparecer {
+    animation: aparecer 0.35s ease-out both;
+  }
+  .sacudir {
+    animation: sacudir 0.35s ease-in-out;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sacudir {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
 }

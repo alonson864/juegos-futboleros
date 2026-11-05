@@ -3,13 +3,15 @@
 # Reglas del proyecto: Juegos Futboleros
 
 - Todo el texto de la página va en español neutro latinoamericano.
-- Diseño mobile-first: todo debe verse y jugarse bien en un celular de 375px de ancho.
+- La primera versión es para laptop/computadora (pantallas de 1280-1440px): ahí debe verse y jugarse mejor.
+  El celular (375px de ancho) se mantiene funcionando: los estilos base son para celular y los de laptop van con el prefijo `lg:`.
 - Cada juego vive en su propia carpeta: `src/app/juegos/<nombre-del-juego>` (el proyecto usa la carpeta `src/`).
 
 ## Datos
 
 - La fuente de datos del proyecto es una base en Supabase. Todos los juegos deben sacar sus datos (jugadores, clubes, puzzles) de esa base, nunca escritos dentro del código.
-- Ningún dato futbolístico puede salir de la memoria de la IA: todo viene de fuentes externas públicas y gratuitas (por ahora Wikidata y Wikimedia Commons) mediante código en `pipeline/` (Python).
+- Ningún dato futbolístico puede salir de la memoria de la IA: todo viene de fuentes externas públicas y gratuitas (Wikidata, Wikipedia en inglés y Wikimedia Commons) mediante código en `pipeline/` (Python).
+- Lo que viene de Wikipedia tiene licencia CC BY-SA 4.0: el sitio debe mostrar siempre el crédito (está en el pie de página).
 - Cada dato guarda su fuente y su fecha de actualización. La tabla de correcciones manuales siempre tiene prioridad sobre lo que trae el pipeline.
 - `data/conexiones.json` son datos de prueba hechos a mano; se van a reemplazar por datos de la base.
 - Las claves de Supabase van en `.env` (nunca en git).

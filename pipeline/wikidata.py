@@ -6,13 +6,22 @@ reintenta con pausas cuando el servicio pide bajar el ritmo.
 
 from __future__ import annotations
 
+import os
 import sys
 import time
+from pathlib import Path
 from typing import Iterable, Iterator
 
 import requests
+from dotenv import load_dotenv
 
-AGENTE = "JuegosFutboleros/0.1 (pipeline de datos personal; python-requests)"
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Wikimedia pide que los programas se identifiquen con un contacto (va en .env).
+_contacto = "; ".join(
+    v for v in (os.environ.get("WIKIMEDIA_CONTACTO_URL"), os.environ.get("WIKIMEDIA_CONTACTO_EMAIL")) if v
+)
+AGENTE = f"JuegosFutboleros/0.1 ({_contacto or 'sin contacto'}) python-requests/{requests.__version__}"
 SPARQL_URL = "https://query.wikidata.org/sparql"
 API_URL = "https://www.wikidata.org/w/api.php"
 PAUSA_ENTRE_PEDIDOS = 1.0  # segundos
@@ -75,16 +84,12 @@ def entidades(qids: Iterable[str], props: str = "labels|claims|sitelinks",
                 "props": props,
                 "languages": idiomas,
                 "format": "json",
-                "maxlag": 5,
+                # Sin "maxlag": ese parámetro es para programas que editan Wikidata;
+                # nosotros solo leemos.
             },
         )
         datos = r.json()
         if "error" in datos:
-            # maxlag: el servidor está cargado; esperamos y repetimos el mismo lote
-            if datos["error"].get("code") == "maxlag":
-                time.sleep(10)
-                yield from entidades(lote, props, idiomas)
-                continue
             raise RuntimeError(f"Error de la API de Wikidata: {datos['error']}")
         for e in datos.get("entities", {}).values():
             if "missing" not in e:
@@ -135,3 +140,23 @@ def fecha(valor: str | None) -> str | None:
     if not valor or valor.startswith("-"):
         return None
     return valor[:10]
+
+
+def enlaces_wikipedia(titulo: str, idioma: str = "es") -> list[str]:
+    """Códigos Q de los artículos a los que enlaza un artículo de Wikipedia."""
+    url = f"https://{idioma}.wikipedia.org/w/api.php"
+    params = {
+        "action": "query", "titles": titulo, "generator": "links", "gplnamespace": 0,
+        "gpllimit": "max", "prop": "pageprops", "ppprop": "wikibase_item",
+        "format": "json", "formatversion": 2,
+    }
+    qids: list[str] = []
+    while True:
+        datos = _pedir("GET", url, params=params).json()
+        for pagina in datos.get("query", {}).get("pages", []):
+            q = pagina.get("pageprops", {}).get("wikibase_item")
+            if q:
+                qids.append(q)
+        if "continue" not in datos:
+            return qids
+        params.update(datos["continue"])
