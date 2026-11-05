@@ -20,6 +20,8 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from nombres import club_corto, nombre_seleccion
+
 # Familias de competiciones: artículos de Wikipedia en inglés que cuentan como lo mismo
 FAMILIAS = {
     "champions": ["UEFA Champions League", "European Cup"],
@@ -32,6 +34,16 @@ FAMILIAS = {
 }
 # "Jugador Mundial de la FIFA" / "FIFA Balón de Oro" / "The Best" quedan fuera por ahora: en
 # Wikipedia a veces vienen en una sola línea mezclados según la época y no se separan bien.
+# Cómo se nombra cada familia en las preguntas: (con artículo, corto)
+TEXTO = {
+    "champions": ("la Champions League", "Champions League"),
+    "mundial": ("el Mundial", "Mundial"),
+    "eurocopa": ("la Eurocopa", "Eurocopa"),
+    "copa_america": ("la Copa América", "Copa América"),
+    "balon_de_oro": ("el Balón de Oro", "Balón de Oro"),
+    "bota_de_oro": ("la Bota de Oro", "Bota de Oro"),
+    "puskas": ("el Premio Puskás", "Premio Puskás"),
+}
 TORNEOS_CLUBES = {"champions"}
 TORNEOS_SELECCIONES = {"mundial", "eurocopa", "copa_america"}
 PREMIOS = {"balon_de_oro", "bota_de_oro", "puskas"}
@@ -65,7 +77,7 @@ def cargar(conn) -> Datos:
                     nombre_familia[fam] = nombre
 
     jugadores = {q: (n, p, set(nac or [])) for q, n, p, nac in conn.execute(
-        "select qid, nombre, popularidad, nacionalidades from jugadores_final")}
+        "select qid, nombre, popularidad, nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'")}
     leidos = {r[0] for r in conn.execute("select jugador_qid from jugadores_wikipedia")}
 
     def fila_a_titulo(comp, anio, individual):
@@ -136,8 +148,15 @@ def cargar(conn) -> Datos:
             campeones_registros[fam] |= {valor} | alias[valor]
 
     nombre_equipo, tipo_equipo = {}, {}
-    for q, n, t in conn.execute("select qid, nombre, tipo from clubes_final"):
-        nombre_equipo[q], tipo_equipo[q] = n, t
+    paises = dict(conn.execute("select qid, nombre from paises").fetchall())
+    for q, n, t, pais in conn.execute("select qid, nombre, tipo, pais_qid from clubes_final"):
+        # Las selecciones mayores se muestran con el nombre del país ("Bolivia")
+        # Selecciones con su nombre real ("Inglaterra", no "Reino Unido"); clubes con nombre corto
+        if t == "seleccion":
+            nombre_equipo[q] = nombre_seleccion(n, paises.get(pais)) or n
+        else:
+            nombre_equipo[q] = club_corto(n)
+        tipo_equipo[q] = t
     for q, n in conn.execute("select campeon_qid, campeon_nombre from ediciones where campeon_qid is not null"):
         nombre_equipo.setdefault(q, n)
 
@@ -151,6 +170,7 @@ def cargar(conn) -> Datos:
             equipos_de[j] |= {eq} | alias[eq]
         anios[j] += [x for x in (desde, hasta) if x]
     conn.commit()
+    nombre_familia = {f: TEXTO[f][1] for f in nombre_familia if f in TEXTO}
     return Datos(familia_de, nombre_familia, jugadores, leidos, titulos, registros, campeones,
                  campeones_registros, nombre_equipo, equipos_de,
                  {j: (min(a), max(a)) for j, a in anios.items() if a}, alias, tipo_equipo)
@@ -167,6 +187,10 @@ def tramo(d: Datos, dif: str) -> set[str]:
 
 def texto_edicion(fam: str, anio: int) -> str:
     return f"{anio - 1}–{anio % 100:02d}" if fam in TORNEOS_CLUBES or fam == "bota_de_oro" else str(anio)
+
+
+def pronombre(fam: str) -> str:
+    return "la" if TEXTO[fam][0].startswith("la ") else "lo"
 
 
 def lista(nombres: list[str]) -> str:
@@ -261,12 +285,12 @@ def gen_ganadores_de_titulo(d: Datos, dif: str, rng: random.Random, n: int):
             "clave": f"ganadores_de_titulo:{fam}:{falso}:{','.join(sorted(verdaderos))}",
             "tipo": "ganadores_de_titulo",
             "dificultad": dif,
-            "afirmacion": f"Todos estos ganaron {nombre}",
+            "afirmacion": f"Todos estos ganaron {TEXTO[fam][0]}",
             "protagonista": {"tipo": "titulo", "qid": fam, "nombre": nombre},
             "opciones": opciones,
             "explicacion": lista([f"{d.jugadores[v][0]} ({', '.join(texto_edicion(fam, a) for a in anios[v])})"
                                   for v in verdaderos])
-                           + f" ganaron {nombre}. {d.jugadores[falso][0]} nunca lo ganó.",
+                           + f" ganaron {TEXTO[fam][0]}. {d.jugadores[falso][0]} nunca {pronombre(fam)} ganó.",
         }
 
 
@@ -319,13 +343,13 @@ def gen_equipos_campeones(d: Datos, dif: str, rng: random.Random, n: int):
                 "clave": f"equipos_campeones:{fam}:{falso}:{','.join(sorted(verdaderos))}",
                 "tipo": "equipos_campeones",
                 "dificultad": dif,
-                "afirmacion": f"Todas estas {sujeto} ganaron {nombre}" if de_selecciones
-                              else f"Todos estos {sujeto} ganaron {nombre}",
+                "afirmacion": f"Todas estas {sujeto} ganaron {TEXTO[fam][0]}" if de_selecciones
+                              else f"Todos estos {sujeto} ganaron {TEXTO[fam][0]}",
                 "protagonista": {"tipo": "titulo", "qid": fam, "nombre": nombre},
                 "opciones": opciones,
                 "explicacion": lista([f"{d.nombre_equipo[v]} ({veces(v)} {'vez' if veces(v) == 1 else 'veces'})"
                                       for v in verdaderos])
-                               + f" ganaron {nombre}. {d.nombre_equipo[falso]} nunca lo ganó.",
+                               + f" ganaron {TEXTO[fam][0]}. {d.nombre_equipo[falso]} nunca {pronombre(fam)} ganó.",
             }
 
 

@@ -7,6 +7,7 @@ const ENLACES = [
   { href: "/", texto: "Inicio" },
   { href: "/juegos/conexiones", texto: "Conexiones" },
   { href: "/juegos/dato-falso", texto: "Dato Falso" },
+  { href: "/juegos/ultimo-en-pie", texto: "Último en pie" },
 ];
 
 export default function Navegacion() {
@@ -28,7 +29,7 @@ export default function Navegacion() {
           </Link>
         );
       })}
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-white/40 lg:inline-flex">
+      <span className="ml-1 hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-white/40 xl:inline-flex">
         Mayor o menor
         <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
           Pronto

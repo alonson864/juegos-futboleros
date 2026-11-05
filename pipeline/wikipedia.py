@@ -255,17 +255,23 @@ def palmares(texto: str) -> list[dict]:
     fin = re.search(r"^==[^=].*==\s*$", texto[m.end():], flags=re.M)
     seccion = texto[m.end(): m.end() + fin.start()] if fin else texto[m.end():]
 
-    titulos, grupo = [], None
+    titulos, grupo, como_entrenador = [], None, False
     for linea in seccion.split("\n"):
         linea = linea.strip()
         if not linea:
             continue
+        # Subsecciones ===Player=== / ===Manager===: lo ganado como entrenador NO cuenta
+        sub = re.match(r"^=+\s*(.+?)\s*=+$", linea)
+        if sub:
+            # (también se ignoran secciones de récords, estadísticas, distinciones civiles, etc.)
+            como_entrenador = bool(re.search(r"manag|coach|entrenador|técnico|record|statistic|"
+                                             r"achievement|order|decoration|honorary|other", sub.group(1), re.I))
         # Encabezados de grupo: '''Barcelona''', ;Barcelona, ===Club===
         cab = re.match(r"^(?:'''(.+?)'''|;\s*(.+)|=+\s*(.+?)\s*=+)$", linea)
         if cab:
             grupo = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", next(g for g in cab.groups() if g)).strip("' ")
             continue
-        if not linea.startswith("*") or ":" not in linea:
+        if como_entrenador or not linea.startswith("*") or ":" not in linea:
             continue
         cuerpo = linea.lstrip("*").strip()
         antes, despues = cuerpo.split(":", 1)
@@ -273,6 +279,10 @@ def palmares(texto: str) -> list[dict]:
             continue                          # subcampeonatos, terceros puestos, etc.
         comp = _ENLACE.search(antes)
         if not comp:
+            continue
+        # El título empieza con el enlace a la competición. Si antes hay texto ("Sweden's only player
+        # to score in [[UEFA European Championship]]…") es un récord o una frase, no un título.
+        if antes[: comp.start()].strip(" '*") or len(antes[comp.end():].strip()) > 25:
             continue
         # "2018; runner-up: 2022" o "1958 (third place), 1960": se descarta cada parte que no sea título
         partes = []

@@ -34,6 +34,16 @@ const juegos: Juego[] = [
   },
   {
     numero: "03",
+    titulo: "Último en pie",
+    descripcion:
+      "Digan por turnos jugadores de la categoría. Si desconfías del rival, verifícalo: el que falla, pierde.",
+    etiquetas: ["Duelo", "2 jugadores", "15 rondas"],
+    href: "/juegos/ultimo-en-pie",
+    fondo: "from-[#0e7a3e]/25 via-[#f5c518]/10 to-transparent",
+    ilustracion: <MiniUltimoEnPie />,
+  },
+  {
+    numero: "04",
     titulo: "Mayor o menor",
     descripcion: "¿Más goles, más partidos, más títulos? Adivina si el siguiente dato es mayor o menor.",
     etiquetas: ["Próximamente"],
@@ -122,7 +132,7 @@ export default async function Home() {
       <section className="mx-auto w-full max-w-3xl px-4 pt-14 pb-16 lg:max-w-6xl lg:px-8 lg:pt-20 lg:pb-24">
         <p className="font-display text-sm font-bold uppercase tracking-[0.2em] text-cancha">Elige tu juego</p>
         <h2 className="mt-1 font-display text-4xl leading-none font-extrabold uppercase lg:text-5xl">A la cancha</h2>
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:gap-6">
           {juegos.map((juego) => (
             <TarjetaJuego key={juego.titulo} juego={juego} />
           ))}
@@ -258,6 +268,23 @@ function MiniDatoFalso() {
           {verdadera ? "✓" : "FALSO"}
         </span>
       ))}
+    </div>
+  );
+}
+
+function MiniUltimoEnPie() {
+  return (
+    <div className="flex w-56 -rotate-2 flex-col gap-2 rounded-2xl bg-superficie/70 p-3 shadow-lg backdrop-blur" aria-hidden="true">
+      <span className="rounded-lg bg-noche px-3 py-2 font-display text-xs font-bold uppercase tracking-wide text-tarjeta">
+        La categoría es…
+      </span>
+      <span className="flex items-center gap-2 rounded-lg border border-borde bg-superficie px-3 py-1.5 text-[11px] text-tenue">
+        <span className="h-3 w-3 rounded-full border-2 border-tenue" /> Verificar jugador…
+      </span>
+      <span className="flex gap-1.5">
+        <span className="rounded-full bg-cancha px-2 py-0.5 text-[10px] font-bold text-white">✓ Cumple</span>
+        <span className="rounded-full bg-roja px-2 py-0.5 text-[10px] font-bold text-white">✗ No cumple</span>
+      </span>
     </div>
   );
 }

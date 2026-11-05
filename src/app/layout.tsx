@@ -71,6 +71,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     Dato Falso Futbolero
                   </Link>
                 </li>
+                <li>
+                  <Link href="/juegos/ultimo-en-pie" className="hover:text-white">
+                    Último en pie
+                  </Link>
+                </li>
                 <li className="text-white/40">Mayor o menor (pronto)</li>
               </ul>
             </div>

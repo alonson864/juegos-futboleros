@@ -33,6 +33,7 @@ from datetime import date
 from psycopg.types.json import Jsonb
 
 import dato_falso_titulos as titulos
+from nombres import club_corto
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
 
 PASO = "generar_dato_falso"
@@ -94,10 +95,12 @@ def se_cruzan(a: Paso, b: Paso) -> bool:
 def cargar(conn):
     jug: dict[str, Jugador] = {}
     for q, n, pop, nacs in conn.execute(
-            "select qid, nombre, popularidad, nacionalidades from jugadores_final"):
+            "select qid, nombre, popularidad, nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'"):
         jug[q] = Jugador(q, n, pop, set(nacs or []))
 
-    clubes = {q: (n, t, p) for q, n, t, p in conn.execute("select qid, nombre, tipo, pais_qid from clubes_final")}
+    # Nombres cortos para mostrar ("Fulham" en vez de "Fulham Football Club")
+    clubes = {q: (club_corto(n) if t == "club" else n, t, p)
+              for q, n, t, p in conn.execute("select qid, nombre, tipo, pais_qid from clubes_final")}
     paises = dict(conn.execute("select qid, nombre from paises").fetchall())
 
     for j, c, ini, fin in conn.execute(

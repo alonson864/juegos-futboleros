@@ -66,7 +66,10 @@ def candidatos(clubes: list[str]) -> set[str]:
         filas = wd.sparql(f"""
             SELECT DISTINCT ?j WHERE {{
               VALUES ?club {{ {valores} }}
-              ?j wdt:P54 ?club ; wikibase:sitelinks ?s .
+              # p:/ps: (no wdt:) para incluir TODOS los clubes, no solo el marcado como "preferido"
+              ?j p:P54 ?st . ?st ps:P54 ?club .
+              FILTER NOT EXISTS {{ ?st wikibase:rank wikibase:DeprecatedRank }}
+              ?j wikibase:sitelinks ?s .
               FILTER(?s >= {UMBRAL_WIKIPEDIAS})
               ?j wdt:P31 wd:{HUMANO} .
             }}""")
@@ -156,7 +159,8 @@ def extraer(e: dict, alias: dict[str, str]) -> dict:
              and isinstance(v := _valor(st["mainsnak"]), str)]
     return {
         "qid": e["id"],
-        "nombre": wd.etiqueta(e) or e["id"],
+        "nombre": wd.nombre_futbolistico(wd.etiqueta(e), e.get("sitelinks", {}).get("enwiki", {}).get("title"))
+                  or e["id"],
         "nacimiento": nac,
         "precision": prec,
         "nacionalidades": sorted(set(wd.valores(e, "P27"))),
@@ -226,6 +230,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--usar-copia", action="store_true",
                     help="no bajar de Wikidata: usar la última descarga guardada en pipeline/salida/")
+    ap.add_argument("--incremental", action="store_true",
+                    help="partir de la última descarga y bajar solo los candidatos nuevos")
     args = ap.parse_args()
     # La conexión no se deja abierta durante la descarga (dura mucho y se corta):
     # se abre una para leer lo necesario y otra nueva para guardar.
@@ -237,7 +243,7 @@ def main() -> None:
         alias = dict(conn.execute("select qid, club_qid from clubes_alias").fetchall())
         conn.commit()
     try:
-        resumen = correr(ejecucion, anterior, clubes_liga, alias, args.usar_copia)
+        resumen = correr(ejecucion, anterior, clubes_liga, alias, args.usar_copia, args.incremental)
     except Exception as e:
         with conectar() as conn:
             terminar_ejecucion(conn, ejecucion, "error", {"error": str(e)[:500]})
@@ -247,7 +253,7 @@ def main() -> None:
     imprimir_reporte(resumen)
 
 
-def correr(ejecucion, anterior, clubes_liga, alias, usar_copia: bool = False) -> dict:
+def correr(ejecucion, anterior, clubes_liga, alias, usar_copia: bool = False, incremental: bool = False) -> dict:
     inicio = time.time()
     if usar_copia:
         log(f"Usando la descarga guardada en {COPIA.name}…")
@@ -259,9 +265,25 @@ def correr(ejecucion, anterior, clubes_liga, alias, usar_copia: bool = False) ->
     log(f"Buscando jugadores de {len(clubes_liga)} clubes (+{len(alias)} fichas de equipo)…")
     ids = candidatos(clubes_liga + list(alias))
 
-    log(f"Leyendo las fichas de {len(ids)} candidatos…")
+    # Incremental: se parte de la última descarga y solo se bajan los candidatos que faltan
     jugadores: dict[str, dict] = {}
-    for n, e in enumerate(wd.entidades(ids, idiomas="es|en"), 1):
+    previo_info: dict[str, dict] = {}
+    previo_pais: dict[str, str] = {}
+    previo_pos: dict[str, str] = {}
+    if incremental and COPIA.exists():
+        d = json.loads(COPIA.read_text(encoding="utf-8"))
+        jugadores = {q: j for q, j in d["jugadores"].items() if q in ids}
+        previo_info = {q: {**x, "tipos": set(x["tipos"])} for q, x in d["equipos"].items()}
+        previo_pais, previo_pos = d["paises"], d["posiciones"]
+        # Los alias pueden haber cambiado: se vuelven a aplicar a los pasos guardados
+        for j in jugadores.values():
+            for paso in j["pasos"]:
+                paso["club"] = alias.get(paso["club"], paso["club"])
+        ids = ids - set(jugadores)
+        log(f"Incremental: {len(jugadores)} jugadores ya descargados; faltan {len(ids)} candidatos")
+
+    log(f"Leyendo las fichas de {len(ids)} candidatos…")
+    for n, e in enumerate(wd.entidades(ids, idiomas="es|en|pt|it|fr|de"), 1):
         if HUMANO not in wd.valores(e, "P31"):
             continue
         j = extraer(e, alias)
@@ -273,20 +295,21 @@ def correr(ejecucion, anterior, clubes_liga, alias, usar_copia: bool = False) ->
 
     # Equipos nuevos (otros clubes, selecciones, juveniles)
     equipos = {p["club"] for j in jugadores.values() for p in j["pasos"]}
-    nuevos_eq = sorted(equipos - set(clubes_liga))
+    nuevos_eq = sorted(equipos - set(clubes_liga) - set(previo_info))
     log(f"Clasificando {len(nuevos_eq)} equipos que no son de nuestras ligas…")
     info = info_equipos(nuevos_eq)
     nombre_tipo = nombres({t for d in info.values() for t in d["tipos"]})
     for q, d in info.items():
         d["tipo"] = clasificar(d["nombre"], d["tipos"], nombre_tipo)
+    info.update({q: x for q, x in previo_info.items() if q in equipos and q not in clubes_liga})
 
     # Nombres de países y posiciones
     paises = {j for x in jugadores.values() for j in x["nacionalidades"]} | {
         d["pais"] for d in info.values() if d["pais"]}
     posiciones = {p for x in jugadores.values() for p in x["posiciones"]}
-    log(f"Leyendo nombres de {len(paises)} países y {len(posiciones)} posiciones…")
-    nombre_pais = nombres(paises)
-    nombre_pos = nombres(posiciones)
+    log(f"Leyendo nombres de {len(paises - set(previo_pais))} países y {len(posiciones - set(previo_pos))} posiciones…")
+    nombre_pais = {**{q: n for q, n in previo_pais.items() if q in paises}, **nombres(paises - set(previo_pais))}
+    nombre_pos = {**{q: n for q, n in previo_pos.items() if q in posiciones}, **nombres(posiciones - set(previo_pos))}
 
     # Copia local antes de guardar: si algo falla, se reintenta con --usar-copia
     COPIA.parent.mkdir(exist_ok=True)

@@ -7,6 +7,7 @@ reintenta con pausas cuando el servicio pide bajar el ritmo.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -160,3 +161,24 @@ def enlaces_wikipedia(titulo: str, idioma: str = "es") -> list[str]:
         if "continue" not in datos:
             return qids
         params.update(datos["continue"])
+
+
+def nombre_futbolistico(etiqueta: str | None, titulo_enwiki: str | None) -> str | None:
+    """Prefiere el nombre futbolístico cuando la etiqueta es el nombre legal completo.
+
+    Ej.: etiqueta "Fernando Luiz Rosa" + artículo "Fernandinho" -> "Fernandinho";
+         "Leonardo Nascimento de Araujo" + "Leonardo (footballer, born 1969)" -> "Leonardo".
+    """
+    if not titulo_enwiki:
+        return etiqueta
+    corto = re.sub(r"\s*\(.*\)\s*$", "", titulo_enwiki).strip()
+    if not etiqueta:
+        return corto
+    pal_corto, pal_etiqueta = corto.lower().split(), etiqueta.lower().split()
+    # Apodo de una sola palabra frente a un nombre legal largo (Fernandinho, Leonardo)
+    if len(pal_corto) == 1 and len(pal_etiqueta) >= 3:
+        return corto
+    # Versión corta contenida en el nombre largo (Cristiano Ronaldo dos Santos Aveiro)
+    if len(pal_corto) < len(pal_etiqueta) and len(pal_etiqueta) >= 3 and set(pal_corto) <= set(pal_etiqueta):
+        return corto
+    return etiqueta

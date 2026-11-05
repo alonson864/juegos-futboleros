@@ -177,6 +177,21 @@ def unir_equipos(pares: dict, info: dict, ligas_qid: set[str]) -> dict[str, tupl
         for f in wd.sparql(f"SELECT ?equipo ?club WHERE {{ VALUES ?equipo {{ {valores} }} ?club wdt:P527 ?equipo . }}"):
             alias.setdefault(wd.qid(f["equipo"]), (wd.qid(f["club"]), "P527"))
 
+    # Fichas de "primer equipo" de los clubes candidatos aunque no aparezcan en temporadas
+    # (por ejemplo, el primer equipo del Barcelona): los jugadores pueden figurar en ellas.
+    clubes = sorted({c for c, _ in pares} - set(alias))
+    for i in range(0, len(clubes), 200):
+        valores = " ".join("wd:" + q for q in clubes[i : i + 200])
+        for f in wd.sparql(f"""
+            SELECT ?equipo ?club WHERE {{
+              VALUES ?club {{ {valores} }}
+              {{ ?equipo wdt:P361 ?club }} UNION {{ ?club wdt:P527 ?equipo }}
+              ?equipo wdt:P31 wd:{EQUIPO_MASCULINO} .
+            }}"""):
+            equipo, club = wd.qid(f["equipo"]), wd.qid(f["club"])
+            if equipo not in {c for c, _ in pares}:
+                alias.setdefault(equipo, (club, "P361"))
+
     nuevos = {c for c, _ in alias.values()} - info.keys()
     info.update({e["id"]: e for e in wd.entidades(nuevos)})
 

@@ -9,8 +9,8 @@ Reglas que se verifican antes de guardar un puzzle:
   - Hay exactamente UNA forma de repartir los 16 jugadores en las 4 categorías
     (se prueban todas las combinaciones posibles).
   - Al menos un jugador "trampa" cumple también la categoría de otro grupo.
-  - Al menos una categoría es latinoamericana (clubes o selecciones de Argentina/Perú).
-  - No se repiten categorías usadas en los últimos 20 puzzles.
+  - Se prefiere al menos una categoría latinoamericana (clubes o selecciones de Argentina/Perú).
+  - No se repiten categorías usadas en los últimos 7 puzzles.
 
 Se puede correr muchas veces: no toca los días que ya tienen puzzle (salvo --regenerar).
 Uso: pipeline/.venv/bin/python pipeline/generar_conexiones.py [--desde AAAA-MM-DD] [--dias 30] [--regenerar]
@@ -28,12 +28,14 @@ from itertools import combinations
 from psycopg.types.json import Jsonb
 
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
+from nombres import club_corto, nombre_seleccion
 
 PASO = "generar_conexiones"
-POPULARIDAD_MINIMA = 25      # Wikipedias: solo jugadores bastante conocidos
+POPULARIDAD_MINIMA = 40      # Wikipedias: solo jugadores bastante conocidos
 MIEMBROS_MINIMOS = 6         # una categoría necesita al menos esta cantidad de jugadores
+MIEMBROS_CLUB = 25           # un club entra solo si muchos jugadores conocidos pasaron por él
 PAISES_LATAM = ("Argentina", "Perú")  # países de ligas.json considerados latinoamericanos
-VENTANA_SIN_REPETIR = 20
+VENTANA_SIN_REPETIR = 7
 
 
 @dataclass
@@ -47,12 +49,13 @@ class Categoria:
 
 def cargar(conn):
     jugadores = {q: (n, p) for q, n, p in conn.execute(
-        "select qid, nombre, popularidad from jugadores_final where popularidad >= %s",
+        "select qid, nombre, popularidad from jugadores_final where popularidad >= %s and nombre !~ '^Q[0-9]+$'",
         (POPULARIDAD_MINIMA,))}
     pasos = conn.execute(
         """select p.jugador_qid, c.qid, c.nombre, c.tipo, c.pais_qid
            from pasos_por_club_final p join clubes_final c on c.qid = p.club_qid
-           where c.tipo in ('club', 'seleccion')""").fetchall()
+           where c.tipo = 'seleccion'
+              or (c.tipo = 'club' and exists (select 1 from clubes_ligas l where l.club_qid = c.qid))""").fetchall()
     paises = dict(conn.execute("select qid, nombre from paises").fetchall())
     latam = {r[0] for r in conn.execute(
         """select distinct c.pais_qid from clubes c join clubes_ligas cl on cl.club_qid = c.qid
@@ -72,16 +75,20 @@ def armar_categorias(jugadores, pasos, paises, latam) -> list[Categoria]:
         if jug not in jugadores:
             continue
         if tipo == "club":
-            c = cats.setdefault(f"club:{club}", Categoria(f"club:{club}", f"Jugaron en {nombre}",
+            c = cats.setdefault(f"club:{club}", Categoria(f"club:{club}", f"Jugaron en {club_corto(nombre)}",
                                                          "club", pais in latam))
         else:
-            if not pais or pais not in paises:
+            # Solo selecciones mayores masculinas de fútbol, con su nombre ("Inglaterra", "Perú")
+            nombre_sel = nombre_seleccion(nombre, paises.get(pais))
+            if not nombre_sel:
                 continue
-            c = cats.setdefault(f"sel:{pais}", Categoria(f"sel:{pais}",
-                                                        f"Jugaron por la selección de {paises[pais]}",
+            c = cats.setdefault(f"sel:{club}", Categoria(f"sel:{club}",
+                                                        f"Jugaron por la selección de {nombre_sel}",
                                                         "seleccion", pais in latam))
         c.miembros.add(jug)
-    simples = [c for c in cats.values() if len(c.miembros) >= MIEMBROS_MINIMOS]
+    # Clubes: solo los que tienen muchos jugadores conocidos (los más reconocibles)
+    simples = [c for c in cats.values()
+               if len(c.miembros) >= (MIEMBROS_CLUB if c.tipo == "club" else MIEMBROS_MINIMOS)]
 
     # Pares de clubes con suficientes jugadores en común (solo entre los clubes más grandes)
     clubes = sorted((c for c in simples if c.tipo == "club"), key=lambda c: -len(c.miembros))[:150]
@@ -129,7 +136,7 @@ def elegir(pool: list[str], n: int, jugadores, rng: random.Random) -> list[str] 
 
 def intentar(cats: list[Categoria], jugadores, rng: random.Random, usadas: set[str]):
     disponibles = [c for c in cats if c.clave not in usadas]
-    for _ in range(3000):
+    for intento in range(3000):
         primera = rng.choice([c for c in disponibles if c.latam] or disponibles)
         elegidas = [primera]
         while len(elegidas) < 4:
@@ -139,7 +146,8 @@ def intentar(cats: list[Categoria], jugadores, rng: random.Random, usadas: set[s
                        and any(c.miembros & e.miembros for e in elegidas)
                        and all(len(c.miembros & e.miembros) <= len(c.miembros) / 2 for e in elegidas)]
             elegidas.append(rng.choice(vecinas or [c for c in disponibles if c not in elegidas]))
-        if not any(c.latam for c in elegidas):
+        # Se prefiere una categoría latinoamericana; en la segunda mitad de intentos ya no se exige
+        if intento < 1500 and not any(c.latam for c in elegidas):
             continue
 
         todos = set().union(*(c.miembros for c in elegidas))
@@ -190,6 +198,11 @@ def main() -> None:
     with conectar() as conn:
         ejecucion = iniciar_ejecucion(conn, PASO)
         try:
+            if args.regenerar:
+                # Al regenerar, los puzzles viejos de esas fechas no deben bloquear categorías
+                conn.execute("delete from conexiones_puzzles where fecha >= %s and fecha < %s",
+                             (args.desde, args.desde + timedelta(days=args.dias)))
+                conn.commit()
             jugadores, pasos, paises, latam, usadas, existentes = cargar(conn)
             cats = armar_categorias(jugadores, pasos, paises, latam)
             print(f"{len(jugadores)} jugadores con {POPULARIDAD_MINIMA}+ Wikipedias, {len(cats)} categorías posibles "
