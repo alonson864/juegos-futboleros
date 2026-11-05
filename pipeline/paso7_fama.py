@@ -8,8 +8,12 @@ Uso: pipeline/.venv/bin/python pipeline/paso7_fama.py
 
 from __future__ import annotations
 
+import json
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from datetime import date
 
 import wikidata as wd
@@ -43,6 +47,22 @@ def titulos(qids: list[str]) -> dict[str, dict[str, str]]:
     return salida
 
 
+CACHE = Path(__file__).resolve().parent / "salida" / "visitas_cache.json"
+_candado = threading.Lock()
+
+
+def _cache() -> dict:
+    return json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+
+
+def _guardar_en_cache(idioma: str, nuevos: dict[str, int]) -> None:
+    with _candado:
+        datos = _cache()
+        datos.setdefault(f"{date.today().isoformat()}:{idioma}", {}).update(nuevos)
+        CACHE.parent.mkdir(exist_ok=True)
+        CACHE.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+
+
 def visitas_por_lotes(idioma: str, lista: list[str]) -> dict[str, int]:
     """título -> visitas de los últimos 60 días, de a 50 artículos por pedido (API de Wikipedia).
 
@@ -50,7 +70,12 @@ def visitas_por_lotes(idioma: str, lista: list[str]) -> dict[str, int]:
     lanza un error (no se anota 0, para no guardar datos falsos).
     """
     url = f"https://{idioma}.wikipedia.org/w/api.php"
-    salida: dict[str, int] = {}
+    # Se retoma lo ya consultado hoy (si el proceso se cortó, no se empieza de cero)
+    salida: dict[str, int] = dict(_cache().get(f"{date.today().isoformat()}:{idioma}", {}))
+    pendientes = [t for t in lista if t not in salida]
+    if len(pendientes) < len(lista):
+        print(f"  {idioma}: retomando, {len(lista) - len(pendientes)} ya consultados hoy", flush=True)
+    lista = pendientes
     for i in range(0, len(lista), 50):
         lote = lista[i : i + 50]
         params = {
@@ -73,9 +98,12 @@ def visitas_por_lotes(idioma: str, lista: list[str]) -> dict[str, int]:
             if "continue" not in datos:
                 break
             params = {**params, **datos["continue"]}
+        nuevos = {}
         for t in lote:
             final = redir.get(destino[t], destino[t])
-            salida[t] = por_titulo.get(final, 0)
+            nuevos[t] = por_titulo.get(final, 0)
+        salida.update(nuevos)
+        _guardar_en_cache(idioma, nuevos)
         if (i // 50) % 50 == 0:
             print(f"  {idioma}: {min(i + 50, len(lista))}/{len(lista)} artículos", flush=True)
     return salida
@@ -91,10 +119,13 @@ def main() -> None:
     tit = titulos(qids)
 
     total: dict[str, int] = {q: 0 for q in qids}
-    for idioma in ("en", "es"):
-        por_jugador = {q: ts[idioma] for q, ts in tit.items() if idioma in ts}
-        vistas = visitas_por_lotes(idioma, sorted(set(por_jugador.values())))
-        for q, t in por_jugador.items():
+    por_idioma = {i: {q: ts[i] for q, ts in tit.items() if i in ts} for i in ("en", "es")}
+    # Inglés y español en paralelo: son servidores distintos y cada uno recibe un pedido a la vez
+    with ThreadPoolExecutor(2) as pool:
+        resultados = dict(zip(("en", "es"), pool.map(
+            lambda i: visitas_por_lotes(i, sorted(set(por_idioma[i].values()))), ("en", "es"))))
+    for idioma, vistas in resultados.items():
+        for q, t in por_idioma[idioma].items():
             total[q] += vistas.get(t, 0)
 
     with conectar() as conn:

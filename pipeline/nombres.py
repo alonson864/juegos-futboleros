@@ -46,6 +46,6 @@ def nombre_seleccion(nombre: str, pais: str | None = None) -> str | None:
     if _NO_MAYOR.search(nombre) or "fútbol" not in nombre.lower():
         return None
     if _SELECCION_MAYOR.match(nombre):
-        p = _SELECCION_MAYOR.sub("", nombre).strip()
+        p = re.sub(r"^(los|las)\s+", "", _SELECCION_MAYOR.sub("", nombre).strip(), flags=re.I)  # "Los Países Bajos"
         return p[:1].upper() + p[1:] if p else None
     return pais if nombre.lower().startswith("selección") else None
