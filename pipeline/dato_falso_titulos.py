@@ -53,7 +53,7 @@ PREMIOS = {"balon_de_oro", "bota_de_oro", "puskas"}
 class Datos:
     familia_de: dict[str, str]                       # qid de competición -> familia
     nombre_familia: dict[str, str]                   # familia -> nombre en español (de Wikidata)
-    jugadores: dict[str, tuple[str, int, set[str]]]  # qid -> (nombre, popularidad, nacionalidades)
+    jugadores: dict[str, tuple[str, int, set[str]]]  # qid -> (nombre, visitas, nacionalidades)
     leidos: set[str]                                 # jugadores con palmarés leído en Wikipedia
     titulos: dict[str, set[tuple[str, int]]]         # jugador -> {(familia, año)} (con correcciones)
     registros: dict[str, set[tuple[str, int | None]]] = field(default_factory=dict)  # TODO registro
@@ -77,7 +77,7 @@ def cargar(conn) -> Datos:
                     nombre_familia[fam] = nombre
 
     jugadores = {q: (n, p, set(nac or [])) for q, n, p, nac in conn.execute(
-        "select qid, nombre, popularidad, nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'")}
+        "select qid, nombre, coalesce(visitas, 0), nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'")}
     leidos = {r[0] for r in conn.execute("select jugador_qid from jugadores_wikipedia")}
 
     def fila_a_titulo(comp, anio, individual):

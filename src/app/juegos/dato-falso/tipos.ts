@@ -1,9 +1,12 @@
+import type { FotoInfo } from "../../componentes/Foto";
+
 export type Dificultad = "facil" | "intermedio" | "dificil";
 
 export type Opcion = {
   texto: string;
   qid: string;
   verdadera: boolean;
+  foto?: FotoInfo;
 };
 
 export type Pregunta = {
@@ -19,5 +22,5 @@ export type Pregunta = {
   afirmacion: string;
   opciones: Opcion[];
   explicacion: string;
-  protagonista?: { tipo: "jugador" | "club" | "pais" | "titulo"; qid: string; nombre: string };
+  protagonista?: { tipo: "jugador" | "club" | "pais" | "titulo"; qid: string; nombre: string; foto?: FotoInfo };
 };

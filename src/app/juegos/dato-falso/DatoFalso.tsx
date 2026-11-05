@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Avatar, CreditosFotos } from "../../componentes/Foto";
 import type { Dificultad, Pregunta } from "./tipos";
+
+// Preguntas cuyas opciones son jugadores (se muestran con foto)
+const OPCIONES_JUGADORES = new Set(["jugadores_de_club", "jugadores_de_pais", "ganadores_de_titulo"]);
 
 /** Preguntas por jugador según la dificultad, en el orden en que se juegan. */
 const PLAN: { dificultad: Dificultad; rondas: number }[] = [
@@ -251,9 +255,14 @@ export default function DatoFalso({ preguntas }: { preguntas: Pregunta[] }) {
           <p className={`font-display text-lg font-extrabold uppercase lg:text-2xl ${COLOR[turno].texto}`}>
             Turno de {nombres[turno]}
           </p>
-          <h2 className="font-display text-2xl leading-tight font-extrabold uppercase lg:text-5xl lg:leading-[1.05]">
-            {pregunta.afirmacion}
-          </h2>
+          <div className="flex items-center gap-4 lg:gap-5">
+            {pregunta.protagonista?.tipo === "jugador" && (
+              <Avatar nombre={pregunta.protagonista.nombre} foto={pregunta.protagonista.foto} tamano={80} />
+            )}
+            <h2 className="font-display text-2xl leading-tight font-extrabold uppercase lg:text-5xl lg:leading-[1.05]">
+              {pregunta.afirmacion}
+            </h2>
+          </div>
           <p className="text-sm text-tenue lg:text-base">¿Cuál es el dato falso?</p>
         </div>
 
@@ -282,6 +291,7 @@ export default function DatoFalso({ preguntas }: { preguntas: Pregunta[] }) {
                   >
                     {i + 1}
                   </span>
+                  {OPCIONES_JUGADORES.has(pregunta.tipo) && <Avatar nombre={o.texto} foto={o.foto} tamano={40} />}
                   {o.texto}
                 </span>
                 {respondida && esLaFalsa && (
@@ -304,6 +314,14 @@ export default function DatoFalso({ preguntas }: { preguntas: Pregunta[] }) {
                 {acerto ? `¡Punto para ${nombres[turno]}!` : `¡Engañaron a ${nombres[turno]}!`}
               </p>
               <p className="text-sm lg:text-base">{pregunta.explicacion}</p>
+              <CreditosFotos
+                fotos={[
+                  ...(pregunta.protagonista?.tipo === "jugador"
+                    ? [{ nombre: pregunta.protagonista.nombre, foto: pregunta.protagonista.foto }]
+                    : []),
+                  ...(OPCIONES_JUGADORES.has(pregunta.tipo) ? pregunta.opciones.map((o) => ({ nombre: o.texto, foto: o.foto })) : []),
+                ]}
+              />
             </div>
             <button
               type="button"

@@ -19,6 +19,7 @@ Uso: pipeline/.venv/bin/python pipeline/generar_conexiones.py [--desde AAAA-MM-D
 from __future__ import annotations
 
 import argparse
+import math
 import random
 import sys
 from dataclasses import dataclass, field
@@ -29,11 +30,11 @@ from psycopg.types.json import Jsonb
 
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
 from nombres import club_corto, nombre_seleccion
+import reconocidos
 
 PASO = "generar_conexiones"
-POPULARIDAD_MINIMA = 40      # Wikipedias: solo jugadores bastante conocidos
 MIEMBROS_MINIMOS = 6         # una categoría necesita al menos esta cantidad de jugadores
-MIEMBROS_CLUB = 25           # un club entra solo si muchos jugadores conocidos pasaron por él
+MIEMBROS_CLUB = 8            # (los clubes ya son solo los grandes)
 PAISES_LATAM = ("Argentina", "Perú")  # países de ligas.json considerados latinoamericanos
 VENTANA_SIN_REPETIR = 7
 
@@ -48,14 +49,21 @@ class Categoria:
 
 
 def cargar(conn):
-    jugadores = {q: (n, p) for q, n, p in conn.execute(
-        "select qid, nombre, popularidad from jugadores_final where popularidad >= %s and nombre !~ '^Q[0-9]+$'",
-        (POPULARIDAD_MINIMA,))}
-    pasos = conn.execute(
-        """select p.jugador_qid, c.qid, c.nombre, c.tipo, c.pais_qid
-           from pasos_por_club_final p join clubes_final c on c.qid = p.club_qid
-           where c.tipo = 'seleccion'
-              or (c.tipo = 'club' and exists (select 1 from clubes_ligas l where l.club_qid = c.qid))""").fetchall()
+    # Solo jugadores reconocidos (los más visitados), clubes grandes y selecciones fuertes
+    rec = reconocidos.cargar(conn)
+    jugadores = {q: (n, v or 0) for q, n, v in conn.execute(
+        "select qid, nombre, visitas from jugadores_final where qid = any(%s)", (list(rec.jugadores),))}
+    canonico = {}                       # ficha del club o de su "primer equipo" -> club grande
+    for c in list(rec.clubes) + list(rec.selecciones):
+        for x in {c} | rec.alias[c]:
+            canonico[x] = c
+    pasos = []
+    for j, c, n, t, pais in conn.execute(
+            """select p.jugador_qid, c.qid, c.nombre, c.tipo, c.pais_qid
+               from pasos_por_club_final p join clubes_final c on c.qid = p.club_qid
+               where c.tipo in ('club', 'seleccion')""").fetchall():
+        if c in canonico:
+            pasos.append((j, canonico[c], n, t, pais))
     paises = dict(conn.execute("select qid, nombre from paises").fetchall())
     latam = {r[0] for r in conn.execute(
         """select distinct c.pais_qid from clubes c join clubes_ligas cl on cl.club_qid = c.qid
@@ -66,7 +74,8 @@ def cargar(conn):
         "jsonb_array_elements(p.grupos) g", (VENTANA_SIN_REPETIR,))]
     existentes = {r[0] for r in conn.execute("select fecha from conexiones_puzzles")}
     conn.commit()
-    return jugadores, pasos, paises, latam, set(usadas), existentes
+    fotos = reconocidos.fotos(conn)
+    return jugadores, pasos, paises, latam, set(usadas), existentes, fotos
 
 
 def armar_categorias(jugadores, pasos, paises, latam) -> list[Categoria]:
@@ -145,7 +154,12 @@ def intentar(cats: list[Categoria], jugadores, rng: random.Random, usadas: set[s
             vecinas = [c for c in disponibles if c not in elegidas
                        and any(c.miembros & e.miembros for e in elegidas)
                        and all(len(c.miembros & e.miembros) <= len(c.miembros) / 2 for e in elegidas)]
-            elegidas.append(rng.choice(vecinas or [c for c in disponibles if c not in elegidas]))
+            resto = vecinas or [c for c in disponibles if c not in elegidas]
+            if not resto:
+                break
+            elegidas.append(rng.choice(resto))
+        if len(elegidas) < 4:
+            continue
         # Se prefiere una categoría latinoamericana; en la segunda mitad de intentos ya no se exige
         if intento < 1500 and not any(c.latam for c in elegidas):
             continue
@@ -178,8 +192,8 @@ def dificultades(grupos, jugadores) -> list[int]:
     base = {"seleccion": 0.0, "club": 1.0, "par": 2.5}
     puntajes = []
     for c, js in grupos:
-        fama = sum(jugadores[j][1] for j in js) / len(js)
-        puntajes.append(base[c.tipo] - fama / 100)
+        fama = sum(math.log10(jugadores[j][1] + 1) for j in js) / len(js)   # ~3 a ~7
+        puntajes.append(base[c.tipo] - fama / 2)
     orden = sorted(range(4), key=lambda i: puntajes[i])
     dif = [0] * 4
     for rango, i in enumerate(orden, 1):
@@ -203,9 +217,9 @@ def main() -> None:
                 conn.execute("delete from conexiones_puzzles where fecha >= %s and fecha < %s",
                              (args.desde, args.desde + timedelta(days=args.dias)))
                 conn.commit()
-            jugadores, pasos, paises, latam, usadas, existentes = cargar(conn)
+            jugadores, pasos, paises, latam, usadas, existentes, fotos = cargar(conn)
             cats = armar_categorias(jugadores, pasos, paises, latam)
-            print(f"{len(jugadores)} jugadores con {POPULARIDAD_MINIMA}+ Wikipedias, {len(cats)} categorías posibles "
+            print(f"{len(jugadores)} jugadores reconocidos, {len(cats)} categorías posibles "
                   f"({sum(c.latam for c in cats)} latinoamericanas).")
             creados, sin_lograr = [], []
             for d in range(args.dias):
@@ -224,6 +238,7 @@ def main() -> None:
                     "categoria": c.nombre,
                     "dificultad": dif,
                     "jugadores": [jugadores[j][0] for j in js],
+                    "fotos": [fotos.get(j) for j in js],
                     "jugadores_qid": js,
                 } for (c, js), dif in sorted(zip(grupos, difs), key=lambda x: x[1])]
                 trampas = [f"{jugadores[trampa][0]} también cumple «{otra.nombre}»."]

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Avatar, CreditosFotos } from "../../componentes/Foto";
 import type { Categoria, Resultado } from "./tipos";
 
 const RONDAS = 15;
@@ -227,13 +228,17 @@ export default function UltimoEnPie({ categorias }: { categorias: Categoria[] })
               <p className="text-sm font-semibold text-tenue">
                 Algunos que valían ({categoria.cantidad} jugadores conocidos cumplen esta categoría):
               </p>
-              <ul className="mt-2 flex flex-wrap gap-1.5">
+              <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                 {categoria.miembros_destacados.map((m) => (
-                  <li key={m} className="rounded-full border border-borde bg-superficie px-3 py-1 text-sm">
-                    {m}
+                  <li key={m.nombre} className="flex items-center gap-2 rounded-2xl border border-borde bg-superficie p-2 text-sm">
+                    <Avatar nombre={m.nombre} foto={m.foto} tamano={36} />
+                    <span className="leading-tight font-medium">{m.nombre}</span>
                   </li>
                 ))}
               </ul>
+              <div className="mt-2">
+                <CreditosFotos fotos={categoria.miembros_destacados} />
+              </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <button
@@ -426,17 +431,22 @@ function Buscador({
           }`}
           aria-live="polite"
         >
-          <p className="flex items-center gap-2 font-display text-2xl font-extrabold uppercase lg:text-3xl">
-            <span
-              className={
-                resultado.cumple === true ? "text-cancha" : resultado.cumple === false ? "text-roja" : "text-tenue"
-              }
-            >
-              {resultado.cumple === true ? "✓ Cumple" : resultado.cumple === false ? "✗ No cumple" : "? Sin datos"}
-            </span>
-            <span className="text-tinta">· {resultado.nombre}</span>
-          </p>
-          <p className="mt-1 text-sm text-tenue">{resultado.detalle}</p>
+          <div className="flex items-center gap-4">
+            <Avatar nombre={resultado.nombre} foto={resultado.foto} tamano={64} />
+            <div>
+              <p className="flex flex-wrap items-center gap-x-2 font-display text-2xl font-extrabold uppercase lg:text-3xl">
+                <span
+                  className={
+                    resultado.cumple === true ? "text-cancha" : resultado.cumple === false ? "text-roja" : "text-tenue"
+                  }
+                >
+                  {resultado.cumple === true ? "✓ Cumple" : resultado.cumple === false ? "✗ No cumple" : "? Sin datos"}
+                </span>
+                <span className="text-tinta">· {resultado.nombre}</span>
+              </p>
+              <p className="mt-1 text-sm text-tenue">{resultado.detalle}</p>
+            </div>
+          </div>
           {resultado.evidencia.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-1.5">
               {resultado.evidencia.map((e, i) => (
@@ -452,6 +462,9 @@ function Buscador({
               ))}
             </ul>
           )}
+          <div className="mt-2">
+            <CreditosFotos fotos={[{ nombre: resultado.nombre, foto: resultado.foto }]} />
+          </div>
         </div>
       )}
     </div>

@@ -8,7 +8,12 @@ type Parametros =
   | { tipo: "titulo"; familia: string; competiciones: string[]; individual: boolean }
   | { tipo: "nacion_club"; clubes: string[]; paises: string[] }
   | { tipo: "muchos_clubes"; minimo: number }
-  | { tipo: "torneo_con"; competiciones: string[]; equipos: string[]; pais: string; torneo: string };
+  | { tipo: "torneo_con"; competiciones: string[]; equipos: string[]; pais: string; torneo: string }
+  | { tipo: "posicion_club"; clubes: string[]; posiciones: string[] }
+  | { tipo: "titulo_con"; competiciones: string[]; equipos: string[] }
+  | { tipo: "titulos"; grupos: { competiciones: string[]; individual: boolean }[] };
+
+type Foto = { url: string; autor: string | null; licencia: string | null; licencia_url: string | null };
 
 type Evidencia = { texto: string; detalle?: string; destacado: boolean };
 
@@ -36,11 +41,41 @@ export async function GET(request: Request) {
     const [cat] = await leerDeSupabase<{ titulo: string; parametros: Parametros }[]>(
       `ultimo_en_pie_categorias?id=eq.${categoria}&select=titulo,parametros`,
     );
-    const [j] = await leerDeSupabase<{ nombre: string; nacionalidades: string[] }[]>(
-      `jugadores_final?qid=eq.${jugador}&select=nombre,nacionalidades`,
-    );
+    const [[j], [imagen]] = await Promise.all([
+      leerDeSupabase<{ nombre: string; nacionalidades: string[]; posiciones: string[] }[]>(
+        `jugadores_final?qid=eq.${jugador}&select=nombre,nacionalidades,posiciones`,
+      ),
+      leerDeSupabase<{ url_miniatura: string; autor: string | null; licencia: string | null; licencia_url: string | null }[]>(
+        `imagenes_final?jugador_qid=eq.${jugador}&licencia_libre=is.true&select=url_miniatura,autor,licencia,licencia_url`,
+      ),
+    ]);
     if (!cat || !j) return Response.json({ error: "No encontrado." }, { status: 404 });
+    const foto: Foto | undefined = imagen?.url_miniatura
+      ? { url: imagen.url_miniatura, autor: imagen.autor, licencia: imagen.licencia, licencia_url: imagen.licencia_url }
+      : undefined;
+    // Todas las respuestas llevan la foto del jugador (si tiene una con licencia libre)
+    const responder = (cuerpo: Record<string, unknown>) => Response.json({ ...cuerpo, foto });
     const p = cat.parametros;
+
+    // Títulos de una lista de competiciones (sin "Individual" salvo en premios)
+    const titulosDe = (competiciones: string[], individual: boolean) =>
+      leerDeSupabase<{ anio: number | null; temporada: string | null; individual: boolean }[]>(
+        `titulos_jugador_final?jugador_qid=eq.${jugador}&competicion_qid=in.${lista(competiciones)}` +
+          `&select=anio,temporada,individual&order=anio.asc`,
+      ).then((ts) => ts.filter((t) => individual || !t.individual));
+    const palmaresLeido = async () =>
+      (await leerDeSupabase<unknown[]>(`jugadores_wikipedia?jugador_qid=eq.${jugador}&select=jugador_qid`)).length > 0;
+
+    if (p.tipo === "titulos") {
+      const grupos = await Promise.all(p.grupos.map((g) => titulosDe(g.competiciones, g.individual)));
+      const evidencia: Evidencia[] = grupos.flatMap((ts) => ts.map((t) => ({ texto: t.temporada ?? String(t.anio), destacado: true })));
+      if (grupos.every((ts) => ts.length > 0)) return responder({ cumple: true, nombre: j.nombre, detalle: "Ganó los dos.", evidencia });
+      return responder(
+        (await palmaresLeido())
+          ? { cumple: false, nombre: j.nombre, detalle: "Según su palmarés en Wikipedia, no ganó los dos.", evidencia }
+          : { cumple: null, nombre: j.nombre, detalle: "No tenemos su palmarés completo. Decidan entre ustedes.", evidencia },
+      );
+    }
 
     if (p.tipo === "titulo") {
       const [titulos, leido] = await Promise.all([
@@ -53,9 +88,9 @@ export async function GET(request: Request) {
       const validos = titulos.filter((t) => p.individual || !t.individual);
       const evidencia: Evidencia[] = validos.map((t) => ({ texto: t.temporada ?? String(t.anio), destacado: true }));
       if (validos.length > 0) {
-        return Response.json({ cumple: true, nombre: j.nombre, detalle: `Lo ganó: ${evidencia.map((e) => e.texto).join(", ")}.`, evidencia });
+        return responder({ cumple: true, nombre: j.nombre, detalle: `Lo ganó: ${evidencia.map((e) => e.texto).join(", ")}.`, evidencia });
       }
-      return Response.json(
+      return responder(
         leido.length > 0
           ? { cumple: false, nombre: j.nombre, detalle: "Según su palmarés en Wikipedia, nunca lo ganó.", evidencia }
           : {
@@ -122,10 +157,10 @@ export async function GET(request: Request) {
       const evidencia = [...clubesDistintos.values()].map((e) => ({ ...e, destacado: true }));
       const n = evidencia.length;
       if (n >= p.minimo) {
-        return Response.json({ cumple: true, nombre: j.nombre, detalle: `Jugó en ${n} clubes.`, evidencia });
+        return responder({ cumple: true, nombre: j.nombre, detalle: `Jugó en ${n} clubes.`, evidencia });
       }
       // Solo con la carrera completa de Wikipedia podemos afirmar que fueron menos
-      return Response.json(
+      return responder(
         (await leido())
           ? { cumple: false, nombre: j.nombre, detalle: `Jugó en ${n} clubes según Wikipedia: no llega.`, evidencia }
           : { cumple: null, nombre: j.nombre, detalle: `En nuestros registros tiene ${n} clubes, pero puede faltar alguno. Decidan entre ustedes.`, evidencia },
@@ -137,10 +172,10 @@ export async function GET(request: Request) {
       const enClub = p.clubes.some((q) => equipos.has(q));
       const pedidos = new Set(p.clubes.map(canonico));
       const evidencia = [...clubesDistintos.entries()].map(([k, e]) => ({ ...e, destacado: pedidos.has(k) }));
-      if (nacionalidad && enClub) return Response.json({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
+      if (nacionalidad && enClub) return responder({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
       if ((j.nacionalidades ?? []).length === 0)
-        return Response.json({ cumple: null, nombre: j.nombre, detalle: "No tenemos su nacionalidad registrada. Decidan entre ustedes.", evidencia });
-      return Response.json({
+        return responder({ cumple: null, nombre: j.nombre, detalle: "No tenemos su nacionalidad registrada. Decidan entre ustedes.", evidencia });
+      return responder({
         cumple: false,
         nombre: j.nombre,
         detalle: !nacionalidad
@@ -148,6 +183,37 @@ export async function GET(request: Request) {
           : "No cumple: no aparece ese club en sus registros.",
         evidencia,
       });
+    }
+
+    if (p.tipo === "posicion_club") {
+      const enClub = p.clubes.some((q) => equipos.has(q));
+      const esDeLaPosicion = (j.posiciones ?? []).some((x) => p.posiciones.includes(x));
+      const evidencia = [...clubesDistintos.entries()].map(([k, e]) => ({ ...e, destacado: p.clubes.map(canonico).includes(k) }));
+      if (enClub && esDeLaPosicion) return responder({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
+      if ((j.posiciones ?? []).length === 0)
+        return responder({ cumple: null, nombre: j.nombre, detalle: "No tenemos su posición registrada. Decidan entre ustedes.", evidencia });
+      return responder({
+        cumple: false,
+        nombre: j.nombre,
+        detalle: !esDeLaPosicion ? "No cumple: no jugó en esa posición según sus registros." : "No cumple: no aparece ese club en sus registros.",
+        evidencia,
+      });
+    }
+
+    if (p.tipo === "titulo_con") {
+      const ganados = await titulosDe(p.competiciones, false);
+      const selecciones = [...equipos].filter((q) => tipo.get(q) === "seleccion");
+      const conEsa = p.equipos.some((q) => equipos.has(q));
+      const evidencia: Evidencia[] = [
+        ...ganados.map((t) => ({ texto: `Campeón ${t.temporada ?? t.anio}`, destacado: true })),
+        ...selecciones.map((q) => ({ texto: nombre.get(q) ?? q, destacado: p.equipos.includes(q) })),
+      ];
+      if (ganados.length > 0 && conEsa) return responder({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
+      if (ganados.length > 0 && !conEsa && selecciones.length > 0)
+        return responder({ cumple: false, nombre: j.nombre, detalle: "No cumple: lo ganó, pero con otra selección.", evidencia });
+      if (ganados.length === 0 && (await palmaresLeido()))
+        return responder({ cumple: false, nombre: j.nombre, detalle: "No cumple: según su palmarés en Wikipedia, no lo ganó.", evidencia });
+      return responder({ cumple: null, nombre: j.nombre, detalle: "No tenemos datos suficientes. Decidan entre ustedes.", evidencia });
     }
 
     if (p.tipo === "torneo_con") {
@@ -162,12 +228,12 @@ export async function GET(request: Request) {
         ...selecciones.map((q) => ({ texto: nombre.get(q) ?? q, destacado: p.equipos.includes(q) })),
       ];
       if (participaciones.length > 0 && conEsa && otras.length === 0)
-        return Response.json({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
+        return responder({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
       if (!conEsa && selecciones.length > 0)
-        return Response.json({ cumple: false, nombre: j.nombre, detalle: "No cumple: nunca jugó por esa selección.", evidencia });
+        return responder({ cumple: false, nombre: j.nombre, detalle: "No cumple: nunca jugó por esa selección.", evidencia });
       if (conEsa && participaciones.length > 0 && otras.length > 0)
-        return Response.json({ cumple: null, nombre: j.nombre, detalle: "Jugó Mundiales y por varias selecciones: no sabemos con cuál fue. Decidan entre ustedes.", evidencia });
-      return Response.json({
+        return responder({ cumple: null, nombre: j.nombre, detalle: "Jugó Mundiales y por varias selecciones: no sabemos con cuál fue. Decidan entre ustedes.", evidencia });
+      return responder({
         cumple: null,
         nombre: j.nombre,
         detalle: "No figura en nuestros registros de Mundiales con esa selección, pero puede faltar el dato. Decidan entre ustedes.",
@@ -200,10 +266,10 @@ export async function GET(request: Request) {
     }
 
     if (cumple) {
-      return Response.json({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
+      return responder({ cumple: true, nombre: j.nombre, detalle: "Sí cumple.", evidencia });
     }
     const sinDatos = evidencia.length === 0;
-    return Response.json({
+    return responder({
       cumple: sinDatos ? null : false,
       nombre: j.nombre,
       detalle: sinDatos

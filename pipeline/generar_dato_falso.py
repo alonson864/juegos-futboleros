@@ -34,6 +34,11 @@ from psycopg.types.json import Jsonb
 
 import dato_falso_titulos as titulos
 from nombres import club_corto
+import reconocidos
+
+# Se completan en main(): clubes grandes y países de selecciones grandes (reconocibles)
+CLUBES_GRANDES: set[str] = set()
+PAISES_GRANDES: set[str] = set()
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
 
 PASO = "generar_dato_falso"
@@ -41,10 +46,10 @@ HOY = date.today()
 
 # Popularidad = número de Wikipedias con artículo
 DIFICULTADES = {
-    #             popularidad mínima, máxima, credibilidad mínima de la falsa (0 a 1)
-    "facil":      (60, 10_000, 0.0),
-    "intermedio": (30, 59, 0.35),
-    "dificil":    (10, 29, 0.6),
+    #             puesto por visitas: desde, hasta (1 = el más visitado), credibilidad mínima de la falsa
+    "facil":      (1, 600, 0.0),
+    "intermedio": (601, 2000, 0.35),
+    "dificil":    (2001, 4000, 0.6),
 }
 
 
@@ -95,8 +100,11 @@ def se_cruzan(a: Paso, b: Paso) -> bool:
 def cargar(conn):
     jug: dict[str, Jugador] = {}
     for q, n, pop, nacs in conn.execute(
-            "select qid, nombre, popularidad, nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'"):
+            "select qid, nombre, coalesce(visitas, 0), nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'"):
         jug[q] = Jugador(q, n, pop, set(nacs or []))
+    # "popularidad" pasa a ser el puesto por visitas: 1 = el más visitado
+    for i, q in enumerate(sorted(jug, key=lambda q: -jug[q].popularidad), 1):
+        jug[q].popularidad = i
 
     # Nombres cortos para mostrar ("Fulham" en vez de "Fulham Football Club")
     clubes = {q: (club_corto(n) if t == "club" else n, t, p)
@@ -266,7 +274,7 @@ def gen_clubes_de_jugador(elegibles, dif, ctx, rng, n):
     rng.shuffle(candidatos)
     for j in candidatos:
         # Posibles falsos: clubes de ligas de la base donde nunca estuvo
-        posibles = {c for c in por_club if clubes[c][1] == "club" and c not in j.registros_club}
+        posibles = {c for c in por_club if c in CLUBES_GRANDES and c not in j.registros_club}
         puntuados = sorted(((credibilidad_club(j, c, ctx), c) for c in posibles), reverse=True)
         puntuados = [(s, c) for s, c in puntuados if s >= cmin]
         if dif == "facil":
@@ -296,7 +304,7 @@ def gen_clubes_de_jugador(elegibles, dif, ctx, rng, n):
 def gen_jugadores_de_club(elegibles, dif, ctx, rng, n):
     jug, clubes, liga_de, por_club, comp = ctx
     pmin, pmax, cmin = DIFICULTADES[dif]
-    clubs = [c for c in por_club if liga_de[c]]
+    clubs = [c for c in por_club if c in CLUBES_GRANDES]
     rng.shuffle(clubs)
     en_rango = [f for f in elegibles if pmin <= f.popularidad <= pmax]
     ligas_jug = {f.qid: set().union(*(liga_de[c] for c in f.clubes())) for f in en_rango}
@@ -304,7 +312,7 @@ def gen_jugadores_de_club(elegibles, dif, ctx, rng, n):
         miembros = list({q: jug[q] for q, _ in por_club[club] if pmin <= jug[q].popularidad <= pmax}.values())
         if len(miembros) < 4:
             continue
-        verdaderos = rng.sample(sorted(miembros, key=lambda m: -m.popularidad)[:12], 4)
+        verdaderos = rng.sample(sorted(miembros, key=lambda m: m.popularidad)[:12], 4)
         cercanos = set().union(*(comp.get(v.qid, set()) for v in verdaderos))
         posibles = [f for f in en_rango if club not in f.registros_club
                     and (ligas_jug[f.qid] & liga_de[club] or f.qid in cercanos)]
@@ -340,10 +348,10 @@ def gen_jugadores_de_pais(elegibles, dif, ctx, rng, n, paises):
     for j in elegibles:
         if pmin <= j.popularidad <= pmax and len(j.nacionalidades) == 1:  # evita doble nacionalidad
             por_pais[next(iter(j.nacionalidades))].append(j)
-    lista_paises = [p for p, js in por_pais.items() if len(js) >= 4 and p in paises]
+    lista_paises = [p for p, js in por_pais.items() if len(js) >= 4 and p in paises and p in PAISES_GRANDES]
     rng.shuffle(lista_paises)
     for pais in lista_paises:
-        verdaderos = rng.sample(sorted(por_pais[pais], key=lambda m: -m.popularidad)[:12], 4)
+        verdaderos = rng.sample(sorted(por_pais[pais], key=lambda m: m.popularidad)[:12], 4)
         cercanos = set().union(*(comp.get(v.qid, set()) for v in verdaderos))
         posibles = [f for f in elegibles if pmin <= f.popularidad <= pmax and pais not in f.registros_pais
                     and f.nacionalidades
@@ -386,6 +394,10 @@ def main() -> None:
         ejecucion = iniciar_ejecucion(conn, PASO)
         try:
             jug, clubes, paises, liga_de = cargar(conn)
+            rec = reconocidos.cargar(conn)
+            fotos = reconocidos.fotos(conn)
+            CLUBES_GRANDES.update(c for x in rec.clubes for c in {x} | rec.alias[x])
+            PAISES_GRANDES.update(clubes[c][2] for c in rec.selecciones if c in clubes and clubes[c][2])
             elegibles = [j for j in jug.values() if j.fechas_completas()]
             print(f"{len(jug)} jugadores en la base; {len(elegibles)} con fechas en todos sus clubes.")
 
@@ -431,6 +443,12 @@ def main() -> None:
                         if not valida(p):   # doble verificación antes de guardar
                             rechazadas += 1
                             continue
+                        # Fotos (Commons, licencia libre) para las opciones que son jugadores y el protagonista
+                        for o in p["opciones"]:
+                            if o["qid"] in fotos:
+                                o["foto"] = fotos[o["qid"]]
+                        if p["protagonista"]["tipo"] == "jugador" and p["protagonista"]["qid"] in fotos:
+                            p["protagonista"]["foto"] = fotos[p["protagonista"]["qid"]]
                         r = conn.execute(
                             """insert into dato_falso_preguntas (clave, tipo, dificultad, afirmacion, protagonista,
                                  opciones, explicacion, ejecucion_id) values (%s, %s, %s, %s, %s, %s, %s, %s)

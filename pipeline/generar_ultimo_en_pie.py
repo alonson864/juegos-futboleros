@@ -25,6 +25,7 @@ from itertools import combinations
 from psycopg.types.json import Jsonb
 
 import dato_falso_titulos as titulos
+import reconocidos
 from db import conectar, iniciar_ejecucion, terminar_ejecucion
 from nombres import club_corto, nombre_seleccion
 
@@ -34,10 +35,16 @@ MIN_CLUB = 15          # mínimo de jugadores conocidos para una categoría de u
 GRANDES_POR_PAIS = 6   # máximo de clubes "muy grandes" por país
 PROPORCION_GRANDE = 0.6  # un club es "muy grande" si tiene al menos el 60 % de conocidos del más grande del país
 MIN_PAR = 5            # mínimo para "jugaron en A y en B" (rivales del mismo país)
-MIN_MUNDIAL = 10       # mínimo de mundialistas de esa selección
-MIN_NACION_CLUB = 6    # "Argentinos que jugaron en Real Madrid": mínimo de jugadores conocidos
-MIN_CONTINENTE_CLUB = 8
+MIN_MUNDIAL = 8        # mínimo de mundialistas de esa selección
+MIN_NACION_CLUB = 5    # "Argentinos que jugaron en Real Madrid": mínimo de jugadores reconocidos
+MIN_CONTINENTE_CLUB = 6
 MAS_DE_CLUBES = 5      # "Jugaron en más de 5 clubes"
+MIN_PORTEROS = 4
+MIN_CAMPEONES = 5
+MIN_DOBLE = 6
+# Combinaciones de dos títulos
+DOBLES = [("champions", "mundial"), ("balon_de_oro", "mundial"), ("champions", "eurocopa"),
+          ("balon_de_oro", "champions"), ("mundial", "copa_america")]
 
 # Cómo se nombra a la gente de cada continente (según el nombre del continente en Wikidata)
 CONTINENTE_PLURAL = {
@@ -97,24 +104,21 @@ def main() -> None:
 
 
 def correr(conn) -> dict:
-    jugadores, nacionalidad = {}, {}
-    for q, n, p, nacs in conn.execute(
-            "select qid, nombre, popularidad, nacionalidades from jugadores_final where nombre !~ '^Q[0-9]+$'"):
-        jugadores[q], nacionalidad[q] = (n, p), set(nacs or [])
-    clubes = {q: (n, t, pais) for q, n, t, pais in conn.execute(
-        "select qid, nombre, tipo, pais_qid from clubes_final")}
+    rec = reconocidos.cargar(conn)
+    foto = reconocidos.fotos(conn)
+    jugadores, nacionalidad, posiciones = {}, {}, {}
+    for q, n, nacs, pos in conn.execute(
+            "select qid, nombre, nacionalidades, posiciones from jugadores_final where nombre !~ '^Q[0-9]+$'"):
+        jugadores[q], nacionalidad[q], posiciones[q] = n, set(nacs or []), set(pos or [])
+    clubes = {q: (n, t, pais) for q, n, t, pais in conn.execute("select qid, nombre, tipo, pais_qid from clubes_final")}
     paises, continente, gentilicio = {}, {}, {}
     for q, n, cont, gent in conn.execute("select qid, nombre, continente, gentilicio from paises"):
         paises[q], continente[q], gentilicio[q] = n, cont, gent
-    de_liga = {r[0] for r in conn.execute("select distinct club_qid from clubes_ligas")}
-    alias = defaultdict(set)
-    for a, c in conn.execute("select qid, club_qid from clubes_alias"):
-        alias[a].add(c)
-        alias[c].add(a)
+    portero = [q for q, n in conn.execute("select qid, nombre from posiciones") if re.search(r"guardameta|portero|arquero", n, re.I)]
+    alias = rec.alias
 
-    # Equipo -> jugadores (pasos de Wikidata + carrera de Wikipedia, con fichas equivalentes)
     miembros: dict[str, set[str]] = defaultdict(set)
-    clubes_de: dict[str, set[str]] = defaultdict(set)   # jugador -> clubes (fichas equivalentes unidas)
+    clubes_de: dict[str, set[str]] = defaultdict(set)
     for j, c in conn.execute(
             "select jugador_qid, club_qid from pasos_por_club_final "
             "union select jugador_qid, equipo_qid from carrera_wikipedia where equipo_qid is not null"):
@@ -123,124 +127,117 @@ def correr(conn) -> dict:
                 miembros[x].add(j)
             if c in clubes and clubes[c][1] == "club" and not FILIAL.search(clubes[c][0]):
                 clubes_de[j].add(min({c} | alias[c]))
-    conn.commit()
-    dt = titulos.cargar(conn)
-
-    conocidos = lambda js: {j for j in js if jugadores[j][1] >= CONOCIDO}  # noqa: E731
-    destacados = lambda js: [jugadores[j][0] for j in sorted(js, key=lambda j: -jugadores[j][1])[:DESTACADOS]]  # noqa: E731
-    cats = []
-
-    # --- Clubes MUY grandes: los GRANDES_POR_PAIS con más jugadores conocidos en cada país ---
-    pais_de_club = dict(conn.execute(
-        "select distinct on (cl.club_qid) cl.club_qid, l.pais from clubes_ligas cl join ligas l on l.qid = cl.liga_qid"
-    ).fetchall())
-    por_pais: dict[str, list] = defaultdict(list)
-    for c in de_liga:
-        if c in clubes and clubes[c][1] == "club" and c in pais_de_club:
-            cs = conocidos(miembros[c])
-            if len(cs) >= MIN_CLUB:
-                por_pais[pais_de_club[c]].append((c, cs))
-    grandes_por_pais = {}
-    for p, cs in por_pais.items():
-        cs = sorted(cs, key=lambda x: -len(x[1]))
-        tope = len(cs[0][1]) * PROPORCION_GRANDE
-        grandes_por_pais[p] = [x for x in cs if len(x[1]) >= tope][:GRANDES_POR_PAIS]
-
-    for pais, grandes in grandes_por_pais.items():
-        # Rivales directos: pares de grandes del MISMO país
-        for (a, ma), (b, mb) in combinations(grandes, 2):
-            comunes = ma & mb
-            if len(comunes) >= MIN_PAR:
-                na, nb = club_corto(clubes[a][0]), club_corto(clubes[b][0])
-                cats.append({
-                    "clave": f"clubes:{min(a, b)}|{max(a, b)}", "titulo": f"Jugaron en {na} y en {nb}",
-                    "parametros": {"tipo": "clubes", "clubes": [sorted({a} | alias[a]), sorted({b} | alias[b])]},
-                    "cantidad": len(comunes), "miembros": destacados(comunes),
-                })
-
-    # --- Nacionalidad o continente + club muy grande ("Argentinos que jugaron en Real Madrid") ---
-    for pais_liga, grandes in grandes_por_pais.items():
-        for c, cs in grandes:
-            pais_club = clubes[c][2]
-            nombre_club = club_corto(clubes[c][0])
-            # Por nacionalidad (no la del propio club: "españoles en el Real Madrid" es demasiado amplio)
-            por_nac: dict[str, set[str]] = defaultdict(set)
-            for j in cs:
-                for n in nacionalidad[j]:
-                    por_nac[n].add(j)
-            for n, js in por_nac.items():
-                plural = gentilicio_plural(gentilicio.get(n))
-                if n != pais_club and plural and len(js) >= MIN_NACION_CLUB:
-                    cats.append({
-                        "clave": f"nacion_club:{n}:{c}", "titulo": f"{plural} que jugaron en {nombre_club}",
-                        "parametros": {"tipo": "nacion_club", "clubes": sorted({c} | alias[c]), "paises": [n]},
-                        "cantidad": len(js), "miembros": destacados(js),
-                    })
-            # Por continente (de otro continente que el club)
-            por_cont: dict[str, set[str]] = defaultdict(set)
-            for j in cs:
-                for n in nacionalidad[j]:
-                    if continente.get(n):
-                        por_cont[continente[n]].add(j)
-            for cont, js in por_cont.items():
-                if cont in CONTINENTE_PLURAL and cont != continente.get(pais_club) and len(js) >= MIN_CONTINENTE_CLUB:
-                    del_cont = sorted(q for q, x in continente.items() if x == cont)
-                    cats.append({
-                        "clave": f"continente_club:{cont}:{c}",
-                        "titulo": f"{CONTINENTE_PLURAL[cont]} que jugaron en {nombre_club}",
-                        "parametros": {"tipo": "nacion_club", "clubes": sorted({c} | alias[c]), "paises": del_cont},
-                        "cantidad": len(js), "miembros": destacados(js),
-                    })
-
-    # --- Jugaron en más de 5 clubes ---
-    viajeros = conocidos({j for j, cs in clubes_de.items() if len(cs) > MAS_DE_CLUBES})
-    cats.append({
-        "clave": f"muchos_clubes:{MAS_DE_CLUBES}", "titulo": f"Jugaron en más de {MAS_DE_CLUBES} clubes",
-        "parametros": {"tipo": "muchos_clubes", "minimo": MAS_DE_CLUBES + 1},
-        "cantidad": len(viajeros), "miembros": destacados(viajeros),
-    })
-
-    # Selecciones mayores de cada jugador (para "Jugaron un Mundial con…")
-    seleccion_de = defaultdict(set)
-    nombre_sel = {c: nombre_seleccion(n, paises.get(p)) for c, (n, t, p) in clubes.items() if t == "seleccion"}
-    for c in clubes:
-        if nombre_sel.get(c):
+    seleccion_de: dict[str, set[str]] = defaultdict(set)      # jugador -> selecciones mayores
+    for c, (n, t, p) in clubes.items():
+        if t == "seleccion" and nombre_seleccion(n, paises.get(p)):
             for j in miembros[c]:
                 seleccion_de[j].add(c)
-
-    # --- Jugaron un Mundial con [país] ---
-    # Participó en un Mundial y jugó SOLO para esa selección mayor (si jugó para dos, no se
-    # puede saber con cuál fue al Mundial, así que no cuenta).
-    mundial = [q for q, f in dt.familia_de.items() if f == "mundial"]
+    mundial = [r[0] for r in conn.execute(
+        "select qid from competiciones where articulo_en = 'FIFA World Cup'")]
     mundialistas = {r[0] for r in conn.execute(
         "select distinct jugador_qid from participaciones where competicion_qid = any(%s)", (mundial,))}
     conn.commit()
-    for c, (nombre, tipo, pais) in clubes.items():
-        if not nombre_sel.get(c):
-            continue
-        equipos = {c} | alias[c]
+    dt = titulos.cargar(conn)
+
+    R = rec.jugadores                                            # jugadores reconocidos
+    def destacados(js):
+        orden = sorted(js, key=lambda j: -rec.visitas.get(j, 0))[:DESTACADOS]
+        return [{"nombre": jugadores[j], **({"foto": foto[j]} if j in foto else {})} for j in orden]
+    def agregar(clave, titulo, parametros, js):
+        cats.append({"clave": clave, "titulo": titulo, "parametros": parametros,
+                     "cantidad": len(js), "miembros": destacados(js)})
+    eq = lambda c: sorted({c} | alias[c])                        # noqa: E731
+    nombre_club = lambda c: club_corto(clubes[c][0])             # noqa: E731
+    cats: list[dict] = []
+
+    grandes = {c: p for c, p in rec.clubes.items() if c in clubes}
+    por_pais: dict[str, list[str]] = defaultdict(list)
+    for c, p in grandes.items():
+        por_pais[p].append(c)
+
+    # 1) Rivales directos (grandes del mismo país)
+    for p, cs in por_pais.items():
+        for a, b in combinations(sorted(cs), 2):
+            js = miembros[a] & miembros[b] & R
+            if len(js) >= MIN_PAR:
+                agregar(f"clubes:{a}|{b}", f"Jugaron en {nombre_club(a)} y en {nombre_club(b)}",
+                        {"tipo": "clubes", "clubes": [eq(a), eq(b)]}, js)
+
+    # 2) Grandes de distintos países (los 12 con más reconocidos)
+    top = sorted(grandes, key=lambda c: -len(miembros[c] & R))[:12]
+    for a, b in combinations(top, 2):
+        if grandes[a] != grandes[b]:
+            js = miembros[a] & miembros[b] & R
+            if len(js) >= MIN_PAR:
+                agregar(f"clubes:{min(a, b)}|{max(a, b)}", f"Jugaron en {nombre_club(a)} y en {nombre_club(b)}",
+                        {"tipo": "clubes", "clubes": [eq(a), eq(b)]}, js)
+
+    # 3) Nacionalidad (solo de selecciones grandes) o continente + club grande
+    paises_grandes = {clubes[c][2] for c in rec.selecciones if clubes[c][2]}
+    for c in grandes:
+        pais_club = clubes[c][2]
+        for n in paises_grandes - {pais_club}:
+            js = {j for j in miembros[c] & R if n in nacionalidad[j]}
+            plural = gentilicio_plural(gentilicio.get(n))
+            if plural and len(js) >= MIN_NACION_CLUB:
+                agregar(f"nacion_club:{n}:{c}", f"{plural} que jugaron en {nombre_club(c)}",
+                        {"tipo": "nacion_club", "clubes": eq(c), "paises": [n]}, js)
+        for cont, plural in CONTINENTE_PLURAL.items():
+            if cont == continente.get(pais_club):
+                continue
+            del_cont = {q for q, x in continente.items() if x == cont}
+            js = {j for j in miembros[c] & R if nacionalidad[j] & del_cont}
+            if len(js) >= MIN_CONTINENTE_CLUB:
+                agregar(f"continente_club:{cont}:{c}", f"{plural} que jugaron en {nombre_club(c)}",
+                        {"tipo": "nacion_club", "clubes": eq(c), "paises": sorted(del_cont)}, js)
+
+    # 4) Porteros que jugaron en un club grande
+    for c in grandes:
+        js = {j for j in miembros[c] if posiciones[j] & set(portero) and rec.rango.get(j, 10**9) <= 6000}
+        if len(js) >= MIN_PORTEROS:
+            agregar(f"porteros:{c}", f"Porteros que jugaron en {nombre_club(c)}",
+                    {"tipo": "posicion_club", "clubes": eq(c), "posiciones": portero}, js)
+
+    # 5) Jugaron un Mundial con… (selecciones grandes y Conmebol)
+    for c, nombre in rec.selecciones.items():
+        equipos = set(eq(c))
         js = {j for j in mundialistas if j in jugadores and seleccion_de.get(j) and seleccion_de[j] <= equipos}
         if len(js) >= MIN_MUNDIAL:
-            cats.append({
-                "clave": f"mundial_con:{c}", "titulo": f"Jugaron un Mundial con {nombre_sel[c]}",
-                "parametros": {"tipo": "torneo_con", "competiciones": mundial, "equipos": sorted(equipos),
-                               "pais": pais, "torneo": "un Mundial"},
-                "cantidad": len(js), "miembros": destacados(js),
-            })
+            agregar(f"mundial_con:{c}", f"Jugaron un Mundial con {nombre}",
+                    {"tipo": "torneo_con", "competiciones": mundial, "equipos": sorted(equipos),
+                     "pais": clubes[c][2], "torneo": "un Mundial"}, js)
 
-    # --- Títulos (solo los de jugadores con palmarés leído) ---
+    # 6) Campeones del mundo con… (título del Mundial y solo esa selección mayor)
+    comps = {f: sorted(q for q, x in dt.familia_de.items() if x == f) for f in titulos.TEXTO}
+    for c, nombre in rec.selecciones.items():
+        equipos = set(eq(c))
+        js = {j for j, ts in dt.titulos.items() if j in jugadores and any(f == "mundial" for f, _ in ts)
+              and seleccion_de.get(j) and seleccion_de[j] <= equipos}
+        if len(js) >= MIN_CAMPEONES:
+            agregar(f"campeones_con:{c}", f"Campeones del mundo con {nombre}",
+                    {"tipo": "titulo_con", "competiciones": comps["mundial"], "equipos": sorted(equipos)}, js)
+
+    # 7) Títulos (uno o dos)
+    def ganaron(fam):
+        return {j for j, ts in dt.titulos.items() if j in jugadores and any(f == fam for f, _ in ts)}
     for fam in titulos.TEXTO:
-        if fam not in dt.nombre_familia:
-            continue
-        ganadores = {j for j, ts in dt.titulos.items() if j in jugadores and any(f == fam for f, _ in ts)}
-        if len(ganadores) >= MIN_TITULO:
-            comps = sorted(q for q, f in dt.familia_de.items() if f == fam)
-            cats.append({
-                "clave": f"titulo:{fam}", "titulo": f"Ganaron {titulos.TEXTO[fam][0]}",
-                "parametros": {"tipo": "titulo", "familia": fam, "competiciones": comps,
-                               "individual": fam in titulos.PREMIOS},
-                "cantidad": len(ganadores), "miembros": destacados(ganadores),
-            })
+        js = ganaron(fam)
+        if fam in dt.nombre_familia and len(js) >= MIN_TITULO:
+            agregar(f"titulo:{fam}", f"Ganaron {titulos.TEXTO[fam][0]}",
+                    {"tipo": "titulo", "familia": fam, "competiciones": comps[fam],
+                     "individual": fam in titulos.PREMIOS}, js)
+    for a, b in DOBLES:
+        js = ganaron(a) & ganaron(b)
+        if len(js) >= MIN_DOBLE:
+            agregar(f"titulos:{a}+{b}", f"Ganaron {titulos.TEXTO[a][0]} y {titulos.TEXTO[b][0]}",
+                    {"tipo": "titulos", "grupos": [
+                        {"competiciones": comps[a], "individual": a in titulos.PREMIOS},
+                        {"competiciones": comps[b], "individual": b in titulos.PREMIOS}]}, js)
+
+    # 8) Jugaron en más de 5 clubes
+    agregar(f"muchos_clubes:{MAS_DE_CLUBES}", f"Jugaron en más de {MAS_DE_CLUBES} clubes",
+            {"tipo": "muchos_clubes", "minimo": MAS_DE_CLUBES + 1},
+            {j for j, cs in clubes_de.items() if len(cs) > MAS_DE_CLUBES} & R)
 
     unicas: dict[str, dict] = {}
     for c in sorted(cats, key=lambda c: -c["cantidad"]):

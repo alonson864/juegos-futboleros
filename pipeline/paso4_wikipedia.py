@@ -1,6 +1,6 @@
 """Paso 4: carrera y palmarés de los jugadores más relevantes, desde Wikipedia en inglés.
 
-- Toma los N jugadores de la base con artículo en más Wikipedias (por defecto 500).
+- Toma los N jugadores más visitados en Wikipedia (por defecto 500; ver paso 7).
 - De cada artículo lee la ficha (partidos y goles por club y selección, y la fecha
   "al día" que indica el artículo) y el palmarés (títulos y premios por edición).
 - Solo vuelve a procesar un jugador si su artículo cambió desde la última vez
@@ -78,7 +78,7 @@ def correr(conn, ejecucion, cantidad: int, forzar: bool) -> dict:
     anterior = ultima_ejecucion_ok(conn, PASO)
     inicio = time.time()
     top = [r[0] for r in conn.execute(
-        "select qid from jugadores_final order by popularidad desc, qid limit %s", (cantidad,))]
+        "select qid from jugadores_final order by visitas desc nulls last, popularidad desc, qid limit %s", (cantidad,))]
     revisiones = dict(conn.execute("select jugador_qid, revision from jugadores_wikipedia").fetchall())
     conn.commit()
     log(f"{len(top)} jugadores más relevantes. Buscando sus artículos en Wikipedia en inglés…")

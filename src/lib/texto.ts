@@ -22,6 +22,6 @@ const SOBRANTES = [
 export function clubCorto(nombre: string): string {
   let corto = nombre;
   for (const patron of SOBRANTES) corto = corto.replace(patron, "");
-  corto = corto.replace(/\s{2,}/g, " ").replace(/^[\s,-]+|[\s,-]+$/g, "");
+  corto = corto.replace(/\s{2,}/g, " ").replace(/^[\s,&-]+|[\s,&-]+$/g, "").replace(/\s+(Cricket|and|y)$/, "");
   return corto.length >= 3 ? corto : nombre;
 }

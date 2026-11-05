@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { Avatar, CreditosFotos } from "../../componentes/Foto";
 import type { Grupo, Puzzle } from "./tipos";
 
 const MAX_ERRORES = 4;
@@ -157,6 +158,9 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
     setMensaje(casi && nuevosErrores < MAX_ERRORES ? "¡Te faltó uno!" : "No es un grupo.");
   }
 
+  const todos = puzzle.grupos.flatMap((g) => g.jugadores.map((j, i) => ({ nombre: j, foto: g.fotos?.[i] ?? null })));
+  const fotoDe = new Map(todos.map((t) => [t.nombre, t.foto]));
+
   return (
     <section className="mt-5 flex flex-col gap-2">
       {gruposVisibles.map((g) => (
@@ -165,7 +169,14 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
           className={`aparecer rounded-2xl px-3 py-3 text-center text-sobre-grupo lg:py-5 ${COLORES[g.dificultad]}`}
         >
           <p className="font-display text-lg leading-tight font-extrabold uppercase lg:text-2xl">{g.categoria}</p>
-          <p className="mt-0.5 text-sm lg:text-base">{g.jugadores.join(" · ")}</p>
+          <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm lg:text-base">
+            {g.jugadores.map((j) => (
+              <li key={j} className="flex items-center gap-1.5">
+                <Avatar nombre={j} foto={fotoDe.get(j)} tamano={28} className="hidden ring-black/10 sm:inline-flex" />
+                {j}
+              </li>
+            ))}
+          </ul>
         </div>
       ))}
 
@@ -179,13 +190,14 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
                 type="button"
                 onClick={() => alternar(jugador)}
                 aria-pressed={activo}
-                className={`flex h-[4.5rem] items-center justify-center rounded-2xl px-1 text-center font-display text-[15px] leading-[1.05] font-bold uppercase break-words hyphens-auto transition active:scale-95 sm:h-20 sm:text-lg lg:h-28 lg:rounded-3xl lg:px-3 lg:text-2xl ${
+                className={`flex h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 text-center font-display text-[15px] leading-[1.05] font-bold uppercase break-words hyphens-auto transition active:scale-95 sm:h-20 sm:text-lg lg:h-36 lg:rounded-3xl lg:px-3 lg:text-xl ${
                   activo
                     ? "bg-tinta text-tiza shadow-inner"
                     : "border border-borde bg-superficie text-tinta shadow-sm hover:bg-superficie-2"
                 }`}
               >
-                {jugador}
+                <Avatar nombre={jugador} foto={fotoDe.get(jugador)} tamano={44} className="hidden lg:inline-flex" />
+                <span>{jugador}</span>
               </button>
             );
           })}
@@ -247,6 +259,9 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
           </div>
         </>
       )}
+      <div className="mt-4">
+        <CreditosFotos fotos={todos} />
+      </div>
     </section>
   );
 }

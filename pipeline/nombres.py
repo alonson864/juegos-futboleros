@@ -20,7 +20,8 @@ def club_corto(nombre: str) -> str:
     corto = nombre
     for patron in _SOBRANTES:
         corto = re.sub(patron, "", corto)
-    corto = re.sub(r"\s{2,}", " ", corto).strip(" -,")
+    corto = re.sub(r"\s{2,}", " ", corto).strip(" -,&")
+    corto = re.sub(r"\s+(Cricket|and|y)$", "", corto)        # "Genoa Cricket & Football Club" -> "Genoa"
     return corto if len(corto) >= 3 else nombre
 
 
