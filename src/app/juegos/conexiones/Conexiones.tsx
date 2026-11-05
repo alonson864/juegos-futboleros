@@ -172,7 +172,7 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
           <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm lg:text-base">
             {g.jugadores.map((j) => (
               <li key={j} className="flex items-center gap-1.5">
-                <Avatar nombre={j} foto={fotoDe.get(j)} tamano={28} className="hidden ring-black/10 sm:inline-flex" />
+                <Avatar nombre={j} foto={fotoDe.get(j)} tamano={36} className="hidden ring-black/10 sm:inline-flex" />
                 {j}
               </li>
             ))}
@@ -190,14 +190,16 @@ function Juego({ puzzle }: { puzzle: Puzzle }) {
                 type="button"
                 onClick={() => alternar(jugador)}
                 aria-pressed={activo}
-                className={`flex h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 text-center font-display text-[15px] leading-[1.05] font-bold uppercase break-words hyphens-auto transition active:scale-95 sm:h-20 sm:text-lg lg:h-36 lg:rounded-3xl lg:px-3 lg:text-xl ${
+                className={`flex h-28 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 text-center font-display text-[11px] leading-[1.05] font-bold uppercase break-words hyphens-auto transition active:scale-95 sm:h-32 sm:text-xs lg:h-48 lg:gap-2.5 lg:rounded-3xl lg:px-3 lg:text-base ${
                   activo
                     ? "bg-tinta text-tiza shadow-inner"
                     : "border border-borde bg-superficie text-tinta shadow-sm hover:bg-superficie-2"
                 }`}
               >
-                <Avatar nombre={jugador} foto={fotoDe.get(jugador)} tamano={44} className="hidden lg:inline-flex" />
-                <span>{jugador}</span>
+                {/* Foto grande y el nombre más chico debajo */}
+                <Avatar nombre={jugador} foto={fotoDe.get(jugador)} tamano={52} className="lg:hidden" />
+                <Avatar nombre={jugador} foto={fotoDe.get(jugador)} tamano={104} className="hidden lg:inline-flex" />
+                <span className="line-clamp-2">{jugador}</span>
               </button>
             );
           })}

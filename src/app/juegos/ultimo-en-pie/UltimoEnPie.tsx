@@ -228,17 +228,13 @@ export default function UltimoEnPie({ categorias }: { categorias: Categoria[] })
               <p className="text-sm font-semibold text-tenue">
                 Algunos que valían ({categoria.cantidad} jugadores conocidos cumplen esta categoría):
               </p>
-              <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              <ul className="mt-2 flex flex-wrap gap-1.5">
                 {categoria.miembros_destacados.map((m) => (
-                  <li key={m.nombre} className="flex items-center gap-2 rounded-2xl border border-borde bg-superficie p-2 text-sm">
-                    <Avatar nombre={m.nombre} foto={m.foto} tamano={36} />
-                    <span className="leading-tight font-medium">{m.nombre}</span>
+                  <li key={m.nombre} className="rounded-full border border-borde bg-superficie px-3 py-1 text-sm">
+                    {m.nombre}
                   </li>
                 ))}
               </ul>
-              <div className="mt-2">
-                <CreditosFotos fotos={categoria.miembros_destacados} />
-              </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <button
