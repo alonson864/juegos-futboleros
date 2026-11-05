@@ -49,3 +49,20 @@ def nombre_seleccion(nombre: str, pais: str | None = None) -> str | None:
         p = re.sub(r"^(los|las)\s+", "", _SELECCION_MAYOR.sub("", nombre).strip(), flags=re.I)  # "Los Países Bajos"
         return p[:1].upper() + p[1:] if p else None
     return pais if nombre.lower().startswith("selección") else None
+
+
+def nombre_lusofono(actual: str, titulo_enwiki: str | None, apodos_repetidos: set[str]) -> str:
+    """Brasileños y portugueses: el nombre por el que se los conoce es el título de su artículo
+    en Wikipedia en inglés ("Endrick", "Rafinha", "Pauleta"), no el nombre legal.
+
+    Si ese nombre es una sola palabra que comparten varios jugadores ("Alex"), se deja el
+    nombre actual para que no se confundan en los juegos.
+    """
+    if not titulo_enwiki:
+        return actual
+    corto = re.sub(r"\s*\(.*\)\s*$", "", titulo_enwiki).strip()
+    if not corto or corto == actual:
+        return actual
+    if len(corto.split()) == 1 and normalizar(corto) in apodos_repetidos:
+        return actual
+    return corto
