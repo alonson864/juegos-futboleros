@@ -26,7 +26,7 @@
 - No agregues librerías nuevas sin preguntarme primero.
 - Ya aprobadas: `requests`, `supabase` (Python), `psycopg`, `python-dotenv`, `@supabase/supabase-js`.
 - El pipeline usa Python 3.12 en `pipeline/.venv`. Las tablas se crean con migraciones en `pipeline/migraciones/` (`pipeline/migrar.py`).
-- Orden del pipeline (cada paso se puede repetir sin duplicar nada): `migrar.py` → `paso1_clubes` → `paso2_jugadores --incremental` → `paso2b_nombres` → `paso2c_paises` → `paso2d_nombres_lusofonos` (después de 2b, que si no pisa estos nombres) → `paso7_fama` → `paso4_wikipedia` → `paso5_torneos_premios` → `paso6_participaciones` → `paso3_fotos` → `paso8_calidad` → generadores (`generar_conexiones --regenerar`, `generar_dato_falso`, `generar_ultimo_en_pie`).
+- Orden del pipeline (cada paso se puede repetir sin duplicar nada): `migrar.py` → `paso1_clubes` → `paso2_jugadores --incremental` → `paso2b_nombres` → `paso2c_paises` → `paso2d_nombres_lusofonos` → `paso2e_nombres_consenso` (2d y 2e después de 2b, que si no pisa estos nombres) → `paso7_fama` → `paso4_wikipedia` → `paso5_torneos_premios` → `paso6_participaciones` → `paso3_fotos` → `paso8_calidad` → generadores (`generar_conexiones --regenerar`, `generar_dato_falso`, `generar_ultimo_en_pie`, `generar_buscaminas`).
 - Para corridas largas usar `caffeinate -i -s` (si la Mac se duerme, se cortan las consultas).
 
 ## Al terminar

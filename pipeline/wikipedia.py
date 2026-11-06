@@ -278,12 +278,18 @@ def palmares(texto: str) -> list[dict]:
         if _NO_TITULO.search(antes):
             continue                          # subcampeonatos, terceros puestos, etc.
         comp = _ENLACE.search(antes)
-        if not comp:
-            continue
-        # El título empieza con el enlace a la competición. Si antes hay texto ("Sweden's only player
-        # to score in [[UEFA European Championship]]…") es un récord o una frase, no un título.
-        if antes[: comp.start()].strip(" '*") or len(antes[comp.end():].strip()) > 25:
-            continue
+        if comp:
+            # El título empieza con el enlace a la competición. Si antes hay texto ("Sweden's only player
+            # to score in [[UEFA European Championship]]…") es un récord o una frase, no un título.
+            if antes[: comp.start()].strip(" '*") or len(antes[comp.end():].strip()) > 25:
+                continue
+            comp_titulo, comp_etiqueta = comp.group(1).strip(), (comp.group(2) or comp.group(1)).strip()
+        else:
+            # Wikipedia no repite el enlace la segunda vez: "* UEFA Champions League: [[2013–14 …]]"
+            texto_comp = antes.strip(" '*")
+            if not texto_comp or len(texto_comp.split()) > 6 or not texto_comp[0].isupper():
+                continue
+            comp_titulo = comp_etiqueta = texto_comp
         # "2018; runner-up: 2022" o "1958 (third place), 1960": se descarta cada parte que no sea título
         partes = []
         for seg in despues.split(";"):
@@ -301,8 +307,8 @@ def palmares(texto: str) -> list[dict]:
             continue
         titulos.append({
             "grupo": grupo,
-            "competicion_titulo": comp.group(1).strip(),
-            "competicion_etiqueta": (comp.group(2) or comp.group(1)).strip(),
+            "competicion_titulo": comp_titulo,
+            "competicion_etiqueta": comp_etiqueta,
             "individual": bool(grupo and re.search(r"individual", grupo, re.I)),
             "ediciones": ediciones,
             "anios": anios,

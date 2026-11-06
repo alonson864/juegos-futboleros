@@ -76,6 +76,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     Último en pie
                   </Link>
                 </li>
+                <li>
+                  <Link href="/juegos/buscaminas" className="hover:text-white">
+                    Buscaminas
+                  </Link>
+                </li>
                 <li className="text-white/40">Mayor o menor (pronto)</li>
               </ul>
             </div>

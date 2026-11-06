@@ -44,6 +44,15 @@ const juegos: Juego[] = [
   },
   {
     numero: "04",
+    titulo: "Buscaminas",
+    descripcion: "12 jugadores cumplen la categoría y 4 son impostores. Por turnos, el que toca un impostor pierde la ronda.",
+    etiquetas: ["Duelo", "2 jugadores", "15 rondas"],
+    href: "/juegos/buscaminas",
+    fondo: "from-[#d93a2b]/15 via-[#0e7a3e]/15 to-transparent",
+    ilustracion: <MiniBuscaminas />,
+  },
+  {
+    numero: "05",
     titulo: "Mayor o menor",
     descripcion: "¿Más goles, más partidos, más títulos? Adivina si el siguiente dato es mayor o menor.",
     etiquetas: ["Próximamente"],
@@ -285,6 +294,24 @@ function MiniUltimoEnPie() {
         <span className="rounded-full bg-cancha px-2 py-0.5 text-[10px] font-bold text-white">✓ Cumple</span>
         <span className="rounded-full bg-roja px-2 py-0.5 text-[10px] font-bold text-white">✗ No cumple</span>
       </span>
+    </div>
+  );
+}
+
+function MiniBuscaminas() {
+  const celdas = ["ok", "", "ok", "", "", "mina", "", "ok", "ok", "", "", "", "", "ok", "", ""];
+  return (
+    <div className="grid -rotate-2 grid-cols-4 gap-1.5 rounded-2xl bg-superficie/70 p-3 shadow-lg backdrop-blur" aria-hidden="true">
+      {celdas.map((c, i) => (
+        <span
+          key={i}
+          className={`flex h-7 w-9 items-center justify-center rounded-md text-xs ${
+            c === "ok" ? "bg-cancha text-white" : c === "mina" ? "bg-roja" : "border border-borde bg-superficie"
+          }`}
+        >
+          {c === "ok" ? "✓" : c === "mina" ? "💣" : ""}
+        </span>
+      ))}
     </div>
   );
 }

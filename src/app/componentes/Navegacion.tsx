@@ -8,6 +8,7 @@ const ENLACES = [
   { href: "/juegos/conexiones", texto: "Conexiones" },
   { href: "/juegos/dato-falso", texto: "Dato Falso" },
   { href: "/juegos/ultimo-en-pie", texto: "Último en pie" },
+  { href: "/juegos/buscaminas", texto: "Buscaminas" },
 ];
 
 export default function Navegacion() {
