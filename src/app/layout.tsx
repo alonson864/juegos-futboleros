@@ -34,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-noche/90 text-white backdrop-blur-md">
           <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-4 px-4 lg:h-16 lg:max-w-6xl lg:px-8">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="Juegos Futboleros, inicio">
+            <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Juegos Futboleros, inicio">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cancha text-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] lg:h-9 lg:w-9">
                 <Pelota className="h-5 w-5 lg:h-6 lg:w-6" />
               </span>
@@ -81,7 +81,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     Buscaminas
                   </Link>
                 </li>
-                <li className="text-white/40">Mayor o menor (pronto)</li>
+                <li>
+                  <Link href="/juegos/mayor-o-menor" className="hover:text-white">
+                    Mayor o menor
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

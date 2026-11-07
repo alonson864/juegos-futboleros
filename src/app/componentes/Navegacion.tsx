@@ -9,12 +9,13 @@ const ENLACES = [
   { href: "/juegos/dato-falso", texto: "Dato Falso" },
   { href: "/juegos/ultimo-en-pie", texto: "Último en pie" },
   { href: "/juegos/buscaminas", texto: "Buscaminas" },
+  { href: "/juegos/mayor-o-menor", texto: "Mayor o menor" },
 ];
 
 export default function Navegacion() {
   const ruta = usePathname();
   return (
-    <nav className="flex items-center gap-1 text-sm" aria-label="Juegos">
+    <nav className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm [scrollbar-width:none]" aria-label="Juegos">
       {ENLACES.map((e) => {
         const activo = e.href === "/" ? ruta === "/" : ruta.startsWith(e.href);
         return (
@@ -22,7 +23,7 @@ export default function Navegacion() {
             key={e.href}
             href={e.href}
             aria-current={activo ? "page" : undefined}
-            className={`rounded-full px-3 py-1.5 font-medium transition-colors ${
+            className={`shrink-0 rounded-full px-3 py-1.5 font-medium whitespace-nowrap transition-colors ${
               activo ? "bg-white/15 text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
             } ${e.href === "/" ? "hidden sm:inline-block" : ""}`}
           >
@@ -30,12 +31,6 @@ export default function Navegacion() {
           </Link>
         );
       })}
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-white/40 xl:inline-flex">
-        Mayor o menor
-        <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-          Pronto
-        </span>
-      </span>
     </nav>
   );
 }

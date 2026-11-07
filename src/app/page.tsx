@@ -54,8 +54,9 @@ const juegos: Juego[] = [
   {
     numero: "05",
     titulo: "Mayor o menor",
-    descripcion: "¿Más goles, más partidos, más títulos? Adivina si el siguiente dato es mayor o menor.",
-    etiquetas: ["Próximamente"],
+    descripcion: "¿Más goles, asistencias, títulos, partidos o millones? Adivina si el siguiente tiene más o menos y sigue la racha.",
+    etiquetas: ["1 a 4 jugadores", "5 categorías"],
+    href: "/juegos/mayor-o-menor",
     fondo: "from-[#1d6fa5]/20 via-[#5aade6]/10 to-transparent",
     ilustracion: <MiniMayorMenor />,
   },
